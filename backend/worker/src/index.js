@@ -49,7 +49,7 @@ async function getAccessToken(env) {
   const clientId = env.QF_CLIENT_ID;
   const clientSecret = env.QF_CLIENT_SECRET;
   const environment = env.QF_ENV || "prelive";
-  const scope = env.QF_SCOPE || "content.audio.read";
+  const scope = env.QF_SCOPE || "content.audio.read content.tafsirs.read";
 
   if (!clientId || !clientSecret) {
     throw new Error("Quran Foundation credentials are not configured");
