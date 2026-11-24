@@ -114,7 +114,7 @@ fun playMinshawiMurattal(controller: MediaController, startSurah: Int) {
             .setMediaMetadata(
                 MediaMetadata.Builder()
                     .setTitle(name)
-                    .setArtist("محمد صديق المنشاوي · مرتل")
+                    .setArtist("محمد صديق المنشاوي · مرتل · Quran Foundation / QuranicAudio")
                     .build()
             )
             .build()
@@ -184,7 +184,7 @@ fun QuranAudioPlayerBar(controller: MediaController?, modifier: Modifier = Modif
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                    Text("محمد صديق المنشاوي · مرتل · QuranicAudio", color = AudioMuted, fontSize = 10.sp)
+                    Text("Quran Foundation · QuranicAudio · المنشاوي", color = AudioMuted, fontSize = 10.sp)
                 }
                 IconButton(onClick = { controller.seekToPreviousMediaItem() }) {
                     Icon(Icons.Outlined.SkipPrevious, contentDescription = "السورة السابقة", tint = AudioGold)
