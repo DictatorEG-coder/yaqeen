@@ -204,6 +204,45 @@ internal fun surahNumberFromMediaId(mediaId: String?): Int? =
 internal fun minshawiMurattalUrl(surahNumber: Int): String =
     quranAudioUrl("minshawi_murattal", surahNumber)
 
+internal fun playQuranFoundationPlaylist(
+    controller: MediaController,
+    reciter: QFChapterReciter,
+    audioFiles: List<QFChapterAudioFile>,
+    startChapter: Int
+) {
+    require(audioFiles.isNotEmpty()) { "No chapter audio files are available for this reciter" }
+    require(startChapter in 1..114) { "Chapter number must be between 1 and 114" }
+
+    val displayName = reciter.translatedName ?: reciter.name
+    val styleName = when (reciter.style?.lowercase()) {
+        "murattal" -> "مرتل"
+        "mujawwad" -> "مجود"
+        else -> reciter.style ?: ""
+    }
+    val artist = listOf(displayName, styleName, reciter.qirat.orEmpty(), "Quran Foundation")
+        .filter { it.isNotBlank() }
+        .joinToString(" · ")
+
+    val playlist = audioFiles.map { file ->
+        MediaItem.Builder()
+            .setMediaId("qf-${reciter.id}-${file.chapterId}")
+            .setUri(file.audioUrl)
+            .setMediaMetadata(
+                MediaMetadata.Builder()
+                    .setTitle(surahNames[file.chapterId - 1])
+                    .setArtist(artist)
+                    .build()
+            )
+            .build()
+    }
+    val startIndex = audioFiles.indexOfFirst { it.chapterId == startChapter }.let {
+        if (it >= 0) it else 0
+    }
+    controller.setMediaItems(playlist, startIndex, 0L)
+    controller.prepare()
+    controller.play()
+}
+
 internal fun playQuranRecitation(controller: MediaController, startSurah: Int, source: QuranAudioSource) {
     require(startSurah in 1..114) { "Surah number must be between 1 and 114" }
     val playlist = surahNames.mapIndexed { index, name ->
