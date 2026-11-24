@@ -24,7 +24,7 @@ import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.MenuBook
-import androidx.compose.material.icons.filled.Mosque
+import androidx.compose.material.icons.filled.LibraryBooks
 import androidx.compose.material.icons.filled.NotificationsNone
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -78,7 +78,7 @@ private fun YaqeenApp() {
                     val tabs = listOf(
                         Triple("الرئيسية", Icons.Default.Home, 0),
                         Triple("القرآن", Icons.Default.MenuBook, 1),
-                        Triple("السنة", Icons.Default.Mosque, 2),
+                        Triple("السنة", Icons.Default.LibraryBooks, 2),
                         Triple("المحفوظات", Icons.Default.BookmarkBorder, 3)
                     )
                     tabs.forEach { (label, icon, index) ->
@@ -217,7 +217,7 @@ private fun HomeScreen(modifier: Modifier = Modifier) {
                     modifier = Modifier.size(42.dp).background(Emerald.copy(alpha = 0.18f), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Default.Mosque, null, tint = Gold)
+                    Icon(Icons.Default.LibraryBooks, null, tint = Gold)
                 }
             }
         }
