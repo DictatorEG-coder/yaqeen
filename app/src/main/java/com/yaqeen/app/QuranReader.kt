@@ -53,6 +53,7 @@ private val QuranEmerald = Color(0xFF287A59)
 private val QuranGold = Color(0xFFD7C18A)
 private val QuranMuted = Color(0xFFAAB7AE)
 private val QuranWhite = Color(0xFFF1F3EF)
+private const val QURAN_PREFS = "yaqeen_quran_reader"
 
 private data class QuranVerse(val number: Int, val text: String)
 private data class QuranSurah(val number: Int, val name: String, val verses: List<QuranVerse>)
@@ -116,6 +117,16 @@ fun QuranReaderScreen(modifier: Modifier = Modifier) {
         try {
             surahs = withContext(Dispatchers.IO) { loadQuran(context.applicationContext) }
             loadError = surahs.size != 114 || surahs.sumOf { it.verses.size } != 6236
+            if (!loadError) {
+                val prefs = context.getSharedPreferences(QURAN_PREFS, android.content.Context.MODE_PRIVATE)
+                val savedSurahNumber = prefs.getInt("last_surah", 0)
+                val savedVerseNumber = prefs.getInt("last_verse", 1)
+                val savedSurah = surahs.firstOrNull { it.number == savedSurahNumber }
+                if (savedSurah != null) {
+                    selectedSurah = savedSurah
+                    selectedVerse = savedVerseNumber.coerceIn(1, savedSurah.verses.size.coerceAtLeast(1))
+                }
+            }
         } catch (_: Exception) {
             loadError = true
         } finally {
@@ -137,6 +148,15 @@ fun QuranReaderScreen(modifier: Modifier = Modifier) {
     }
 
     val current = selectedSurah
+    LaunchedEffect(current?.number, selectedVerse) {
+        current?.let { surah ->
+            context.getSharedPreferences(QURAN_PREFS, android.content.Context.MODE_PRIVATE)
+                .edit()
+                .putInt("last_surah", surah.number)
+                .putInt("last_verse", selectedVerse ?: 1)
+                .apply()
+        }
+    }
     if (current != null) {
         val listState = rememberLazyListState()
         LaunchedEffect(current.number, selectedVerse) {
@@ -182,7 +202,7 @@ fun QuranReaderScreen(modifier: Modifier = Modifier) {
                     ) {
                         Text(
                             verse.text,
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth().clickable { selectedVerse = verse.number },
                             color = QuranWhite,
                             fontSize = 25.sp,
                             lineHeight = 48.sp,
