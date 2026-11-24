@@ -16,6 +16,14 @@ internal data class QFChapterReciter(
     val translatedName: String?
 )
 
+internal data class QFChapterAudioFile(
+    val id: Int,
+    val chapterId: Int,
+    val audioUrl: String,
+    val fileSize: Long,
+    val format: String
+)
+
 internal data class QFWordSegment(
     val wordIndex: Int,
     val startMs: Int,
@@ -47,6 +55,12 @@ internal class QuranFoundationClient(
     suspend fun fetchChapterReciters(): List<QFChapterReciter> {
         val body = getJson("/api/quran/resources/chapter_reciters?language=ar")
         return parseChapterReciters(body)
+    }
+
+    suspend fun fetchChapterAudioFiles(reciterId: Int): List<QFChapterAudioFile> {
+        require(reciterId > 0) { "Reciter ID must be positive" }
+        val body = getJson("/api/quran/chapter_recitations/$reciterId")
+        return parseChapterAudioFiles(body)
     }
 
     suspend fun fetchChapterAudio(
@@ -116,6 +130,28 @@ internal class QuranFoundationClient(
                     )
                 }
             }
+        }
+
+        internal fun parseChapterAudioFiles(json: String): List<QFChapterAudioFile> {
+            val root = JSONObject(json)
+            val array = root.optJSONArray("audio_files")
+                ?: throw IllegalArgumentException("Missing audio_files array")
+            return buildList {
+                val seenChapters = mutableSetOf<Int>()
+                for (index in 0 until array.length()) {
+                    val item = array.optJSONObject(index) ?: continue
+                    val id = item.optInt("id", 0)
+                    val chapterId = item.optInt("chapter_id", 0)
+                    val audioUrl = item.optString("audio_url", "").trim()
+                    val fileSize = item.optLong("file_size", 0L)
+                    val format = item.optString("format", "").trim()
+                    if (id <= 0 || chapterId !in 1..114 || fileSize <= 0L ||
+                        !audioUrl.startsWith("https://") || format.isBlank() ||
+                        !seenChapters.add(chapterId)
+                    ) continue
+                    add(QFChapterAudioFile(id, chapterId, audioUrl, fileSize, format))
+                }
+            }.sortedBy { it.chapterId }
         }
 
         internal fun parseChapterAudio(json: String): QFChapterAudio {
