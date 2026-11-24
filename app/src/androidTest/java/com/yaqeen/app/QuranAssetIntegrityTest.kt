@@ -15,6 +15,7 @@ class QuranAssetIntegrityTest {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val assetText = context.assets.open("quran-uthmani.txt")
             .bufferedReader(Charsets.UTF_8).use { it.readText() }
+        assertTrue("The application Quran parser rejected the bundled text", isCompleteQuran(loadQuran(context)))
         val dataLines = assetText.lineSequence()
             .filter { it.matches(Regex("^\\d+\\|\\d+\\|.*$")) }
             .toList()
