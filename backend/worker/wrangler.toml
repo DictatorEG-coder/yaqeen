@@ -5,4 +5,4 @@ workers_dev = true
 
 [vars]
 QF_ENV = "prelive"
-QF_SCOPE = "content.quran.read content.audio.read content.tafsirs.read"
+QF_SCOPE = "content.audio.read"
