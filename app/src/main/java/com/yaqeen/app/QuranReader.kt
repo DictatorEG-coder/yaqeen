@@ -54,7 +54,6 @@ private val QuranGold = Color(0xFFD7C18A)
 private val QuranMuted = Color(0xFFAAB7AE)
 private val QuranWhite = Color(0xFFF1F3EF)
 private const val QURAN_PREFS = "yaqeen_quran_reader"
-private const val QURAN_BASMALA = "بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ"
 
 private data class QuranVerse(val number: Int, val text: String)
 private data class QuranSurah(val number: Int, val name: String, val verses: List<QuranVerse>)
@@ -105,13 +104,19 @@ private fun isCompleteQuran(surahs: List<QuranSurah>): Boolean {
 
 private data class QuranSurahVerse(val surahNumber: Int, val verse: QuranVerse)
 
+private fun openingBasmala(verse: QuranVerse): String? {
+    val marker = "ٱلرَّحِيمِ"
+    val markerStart = verse.text.indexOf(marker)
+    if (markerStart < 0) return null
+    val end = markerStart + marker.length
+    if (end >= verse.text.length || !verse.text[end].isWhitespace()) return null
+    return verse.text.substring(0, end)
+}
+
 private fun displayVerseText(surahNumber: Int, verse: QuranVerse): String {
     val isOpeningBasmala = surahNumber != 1 && surahNumber != 9 && verse.number == 1
-    return if (isOpeningBasmala && verse.text.startsWith(QURAN_BASMALA)) {
-        verse.text.removePrefix(QURAN_BASMALA).trimStart()
-    } else {
-        verse.text
-    }
+    val basmala = if (isOpeningBasmala) openingBasmala(verse) else null
+    return if (basmala != null) verse.text.removePrefix(basmala).trimStart() else verse.text
 }
 
 private fun normalizeArabic(value: String): String {
@@ -206,14 +211,16 @@ fun QuranReaderScreen(modifier: Modifier = Modifier) {
             }
             LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
                 if (current.number != 1 && current.number != 9) {
-                    item {
-                        Text(
-                            QURAN_BASMALA,
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 20.dp),
-                            color = QuranGold,
-                            fontSize = 25.sp,
-                            textAlign = TextAlign.Center
-                        )
+                    openingBasmala(current.verses.firstOrNull() ?: QuranVerse(0, ""))?.let { basmala ->
+                        item {
+                            Text(
+                                basmala,
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 20.dp),
+                                color = QuranGold,
+                                fontSize = 25.sp,
+                                textAlign = TextAlign.Center
+                            )
+                        }
                     }
                 }
                 items(current.verses, key = { "${current.number}:${it.number}" }) { verse ->
@@ -302,8 +309,10 @@ fun QuranReaderScreen(modifier: Modifier = Modifier) {
                                 Text("${surah.name} · الآية ${verse.number}", color = QuranGold, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                                 Spacer(Modifier.height(7.dp))
                                 if (surah.number != 1 && surah.number != 9 && verse.number == 1) {
-                                    Text(QURAN_BASMALA, color = QuranGold, fontSize = 18.sp, lineHeight = 30.sp)
-                                    Spacer(Modifier.height(4.dp))
+                                    openingBasmala(verse)?.let { basmala ->
+                                        Text(basmala, color = QuranGold, fontSize = 18.sp, lineHeight = 30.sp)
+                                        Spacer(Modifier.height(4.dp))
+                                    }
                                 }
                                 Text(displayVerseText(surah.number, verse), color = QuranWhite, fontSize = 20.sp, lineHeight = 36.sp)
                             }
