@@ -57,6 +57,15 @@ class QuranAudioSourceTest {
     }
 
     @Test
+    fun preservesSurahNumberWhenSwitchingReciters() {
+        assertEquals(47, surahNumberFromMediaId("minshawi_murattal-47"))
+        assertEquals(1, surahNumberFromMediaId("abdulbaset_mujawwad-1"))
+        assertEquals(114, surahNumberFromMediaId("afasy-114"))
+        assertEquals(null, surahNumberFromMediaId("afasy-115"))
+        assertEquals(null, surahNumberFromMediaId(null))
+    }
+
+    @Test
     fun convertsSleepTimerMinutesToMilliseconds() {
         assertEquals(900_000L, sleepTimerDelayMs(15))
         assertEquals(5_400_000L, sleepTimerDelayMs(90))
