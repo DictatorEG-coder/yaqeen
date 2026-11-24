@@ -48,7 +48,11 @@ class QuranAudioSourceTest {
             "https://download.quranicaudio.com/quran/mishaari_raashid_al_3afaasee/047.mp3",
             quranAudioUrl("afasy", 47)
         )
-        assertEquals(8, quranAudioSources.size)
+        assertEquals(
+            "https://cdn.mp3quran.net/audio/muhammad-luhaidan/r1/047.mp3",
+            quranAudioUrl("luhaidan", 47)
+        )
+        assertEquals(9, quranAudioSources.size)
     }
 
     @Test(expected = IllegalArgumentException::class)
