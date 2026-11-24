@@ -820,7 +820,7 @@ private fun FridayReminderCard(
 ) {
     val context = LocalContext.current
     var enabled by remember { mutableStateOf(FridayReminderScheduler.isEnabled(context, kind)) }
-    var hour by remember { mutableIntStateOf(FridayReminderScheduler.hour(context, kind)) }
+    var hour by remember { mutableIntStateOf(FridayReminderScheduler.hour(context, kind, defaultHour)) }
     var minute by remember { mutableIntStateOf(FridayReminderScheduler.minute(context, kind)) }
     var permissionDenied by remember { mutableStateOf(false) }
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
