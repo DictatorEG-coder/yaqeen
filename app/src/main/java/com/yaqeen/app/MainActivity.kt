@@ -130,7 +130,8 @@ private fun YaqeenApp(initialSurahNumber: Int = 0, openFridayReminders: Boolean 
                             Triple("القرآن", Icons.Outlined.MenuBook, 1),
                             Triple("السنة", Icons.Outlined.LibraryBooks, 2),
                             Triple("الأذكار", Icons.Outlined.Bookmarks, 3),
-                            Triple("المزيد", Icons.Outlined.MoreHoriz, 4)
+                            Triple("التذكيرات", Icons.Outlined.NotificationsNone, 4),
+                            Triple("المزيد", Icons.Outlined.MoreHoriz, 5)
                         )
                         tabs.forEach { (label, icon, index) ->
                             NavigationBarItem(
@@ -163,6 +164,7 @@ private fun YaqeenApp(initialSurahNumber: Int = 0, openFridayReminders: Boolean 
                     )
                     2 -> SunnahScreen(Modifier.padding(padding))
                     3 -> AdhkarScreen(Modifier.padding(padding))
+                    4 -> RemindersScreen(Modifier.padding(padding))
                     else -> MoreScreen(
                         modifier = Modifier.padding(padding),
                         onOpenBookmarks = { selectedTab = 1; openBookmarksRequested = true }
@@ -1153,5 +1155,23 @@ private fun SimpleRow(
             Spacer(Modifier.height(4.dp))
             Text(subtitle, color = Muted, fontSize = 10.sp)
         }
+    }
+}
+
+@Composable
+private fun RemindersScreen(modifier: Modifier = Modifier) {
+    PageColumn(modifier) {
+        PageHeader("التذكيرات", "تذكيرات مستقلة قابلة للتحكم")
+        SectionHeading("تذكيرات يوم الجمعة")
+        Spacer(Modifier.height(10.dp))
+        FridayReminderCard(FridayReminderKind.KAHF, "قراءة سورة الكهف", "تذكير أسبوعي يوم الجمعة ويفتح السورة مباشرة.", 9)
+        FridaySalawatReminderCard()
+        FridayReminderCard(FridayReminderKind.HADITH, "حديث يوم الجمعة", "تذكير أسبوعي بحديث متعلق بفضل الجمعة.", 10)
+        FridayHadithCard()
+        SectionHeading("التذكيرات اليومية")
+        Spacer(Modifier.height(8.dp))
+        SalawatReminderCard()
+        InfoCard("بقية التذكيرات", "تذكير الحديث والسنة المهجورة وقيام الليل وقراءة القرآن وأذكار الصباح والمساء لم تُنفذ بعد كجداول مستقلة.")
+        Spacer(Modifier.height(22.dp))
     }
 }
