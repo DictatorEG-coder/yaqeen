@@ -57,8 +57,8 @@ private val QuranMuted = Color(0xFFAAB7AE)
 private val QuranWhite = Color(0xFFF1F3EF)
 private const val QURAN_PREFS = "yaqeen_quran_reader"
 
-private data class QuranVerse(val number: Int, val text: String)
-private data class QuranSurah(val number: Int, val name: String, val verses: List<QuranVerse>)
+internal data class QuranVerse(val number: Int, val text: String)
+internal data class QuranSurah(val number: Int, val name: String, val verses: List<QuranVerse>)
 
 // Standard verse totals, cross-checked against the Quran.com surah index.
 internal val expectedVerseCounts = listOf(
@@ -89,16 +89,20 @@ private val surahNames = listOf(
 )
 
 internal fun loadQuran(context: android.content.Context): List<QuranSurah> {
-    val verses = context.assets.open("quran-uthmani.txt").bufferedReader(Charsets.UTF_8).useLines { lines ->
-        lines.mapNotNull { line ->
-            val parts = line.split('|', limit = 3)
-            if (parts.size != 3) return@mapNotNull null
-            val surahNumber = parts[0].toIntOrNull() ?: return@mapNotNull null
-            val verseNumber = parts[1].toIntOrNull() ?: return@mapNotNull null
-            if (surahNumber !in 1..114 || verseNumber < 1 || parts[2].isBlank()) return@mapNotNull null
-            QuranSurahVerse(surahNumber, QuranVerse(verseNumber, parts[2]))
-        }.toList()
-    }
+    val rawText = context.assets.open("quran-uthmani.txt")
+        .bufferedReader(Charsets.UTF_8).use { it.readText() }
+    return parseQuran(rawText)
+}
+
+internal fun parseQuran(rawText: String): List<QuranSurah> {
+    val verses = rawText.lineSequence().mapNotNull { line ->
+        val parts = line.split('|', limit = 3)
+        if (parts.size != 3) return@mapNotNull null
+        val surahNumber = parts[0].toIntOrNull() ?: return@mapNotNull null
+        val verseNumber = parts[1].toIntOrNull() ?: return@mapNotNull null
+        if (surahNumber !in 1..114 || verseNumber < 1 || parts[2].isBlank()) return@mapNotNull null
+        QuranSurahVerse(surahNumber, QuranVerse(verseNumber, parts[2]))
+    }.toList()
     val grouped = verses.groupBy { it.surahNumber }
     return surahNames.mapIndexed { index, name ->
         val number = index + 1
