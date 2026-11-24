@@ -128,6 +128,23 @@ function withCors(response) {
   });
 }
 
+async function callSunnah(env, upstreamPath, queryString) {
+  if (!env.SUNNAH_API_KEY) {
+    throw new Error("Sunnah.com API key is not configured");
+  }
+  const response = await fetch(
+    "https://api.sunnah.com/v1" + upstreamPath + queryString,
+    {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        "X-API-Key": env.SUNNAH_API_KEY
+      }
+    }
+  );
+  return withCors(response);
+}
+
 async function callQuranFoundation(env, upstreamPath, queryString, retry = true) {
   const urls = environmentUrls(env.QF_ENV || "prelive");
   const token = await getAccessToken(env);
@@ -174,6 +191,25 @@ export default {
         service: "yaqeen-content-proxy",
         environment: env.QF_ENV || "prelive"
       });
+    }
+
+    const sunnahPrefix = "/api/sunnah";
+    if (url.pathname.startsWith(sunnahPrefix + "/")) {
+      const upstreamPath = url.pathname.slice(sunnahPrefix.length);
+      const allowed = ["/collections", "/hadiths"].some(
+        item => upstreamPath === item || upstreamPath.startsWith(item + "/")
+      );
+      if (!allowed || upstreamPath.includes("..")) {
+        return json({ error: "route_not_allowed" }, 404);
+      }
+      try {
+        return await callSunnah(env, upstreamPath, url.search);
+      } catch (error) {
+        return json({
+          error: "sunnah_upstream_unavailable",
+          message: error instanceof Error ? error.message : "Unknown upstream error"
+        }, 502);
+      }
     }
 
     const prefix = "/api/quran";
