@@ -22,6 +22,17 @@
             </intent-filter>
         </activity>
         <receiver
+            android:name=".FridayReminderReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.yaqeen.app.ACTION_FRIDAY_KAHF" />
+                <action android:name="com.yaqeen.app.ACTION_FRIDAY_SALAWAT" />
+                <action android:name="com.yaqeen.app.ACTION_FRIDAY_HADITH" />
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+        <receiver
             android:name=".SalawatReminderReceiver"
             android:enabled="true"
             android:exported="false">
