@@ -17,4 +17,15 @@ class QuranAudioSourceTest {
     fun rejectsSurahNumbersOutsideTheQuran() {
         minshawiMurattalUrl(115)
     }
+
+    @Test
+    fun convertsSleepTimerMinutesToMilliseconds() {
+        assertEquals(900_000L, sleepTimerDelayMs(15))
+        assertEquals(5_400_000L, sleepTimerDelayMs(90))
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun rejectsInvalidSleepTimerDuration() {
+        sleepTimerDelayMs(0)
+    }
 }
