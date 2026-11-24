@@ -82,6 +82,7 @@ private fun loadQuran(context: android.content.Context): List<QuranSurah> {
             if (parts.size != 3) return@mapNotNull null
             val surahNumber = parts[0].toIntOrNull() ?: return@mapNotNull null
             val verseNumber = parts[1].toIntOrNull() ?: return@mapNotNull null
+            if (surahNumber !in 1..114 || verseNumber < 1 || parts[2].isBlank()) return@mapNotNull null
             QuranSurahVerse(surahNumber, QuranVerse(verseNumber, parts[2]))
         }.toList()
     }
@@ -89,6 +90,15 @@ private fun loadQuran(context: android.content.Context): List<QuranSurah> {
     return surahNames.mapIndexed { index, name ->
         val number = index + 1
         QuranSurah(number, name, grouped[number].orEmpty().map { it.verse }.sortedBy { it.number })
+    }
+}
+
+private fun isCompleteQuran(surahs: List<QuranSurah>): Boolean {
+    if (surahs.size != 114 || surahs.sumOf { it.verses.size } != 6236) return false
+    return surahs.withIndex().all { (index, surah) ->
+        surah.number == index + 1 &&
+            surah.verses.isNotEmpty() &&
+            surah.verses.withIndex().all { (verseIndex, verse) -> verse.number == verseIndex + 1 }
     }
 }
 
@@ -116,7 +126,7 @@ fun QuranReaderScreen(modifier: Modifier = Modifier) {
     LaunchedEffect(Unit) {
         try {
             surahs = withContext(Dispatchers.IO) { loadQuran(context.applicationContext) }
-            loadError = surahs.size != 114 || surahs.sumOf { it.verses.size } != 6236
+            loadError = !isCompleteQuran(surahs)
             if (!loadError) {
                 val prefs = context.getSharedPreferences(QURAN_PREFS, android.content.Context.MODE_PRIVATE)
                 val savedSurahNumber = prefs.getInt("last_surah", 0)
@@ -160,7 +170,13 @@ fun QuranReaderScreen(modifier: Modifier = Modifier) {
     if (current != null) {
         val listState = rememberLazyListState()
         LaunchedEffect(current.number, selectedVerse) {
-            selectedVerse?.let { listState.scrollToItem(it.coerceAtMost(current.verses.size)) }
+            selectedVerse?.let { verseNumber ->
+                val hasOpeningBasmala = current.number != 1 && current.number != 9
+                val itemIndex = verseNumber - 1 + if (hasOpeningBasmala) 1 else 0
+                if (current.verses.isNotEmpty()) {
+                    listState.scrollToItem(itemIndex.coerceIn(0, current.verses.lastIndex + if (hasOpeningBasmala) 1 else 0))
+                }
+            }
         }
         Column(
             modifier = modifier.fillMaxSize().background(QuranInk).padding(horizontal = 16.dp)
