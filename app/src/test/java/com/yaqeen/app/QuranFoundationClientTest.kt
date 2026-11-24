@@ -41,6 +41,28 @@ class QuranFoundationClientTest {
     }
 
     @Test
+    fun parsesAndOrdersAvailableChapterAudioFiles() {
+        val json = """
+            {
+              "audio_files": [
+                {"id": 2, "chapter_id": 2, "file_size": 2000, "format": "mp3", "audio_url": "https://audio.example/002.mp3"},
+                {"id": 1, "chapter_id": 1, "file_size": 1000, "format": "mp3", "audio_url": "https://audio.example/001.mp3"},
+                {"id": 3, "chapter_id": 2, "file_size": 3000, "format": "mp3", "audio_url": "https://audio.example/duplicate.mp3"},
+                {"id": 4, "chapter_id": 115, "file_size": 4000, "format": "mp3", "audio_url": "https://audio.example/115.mp3"},
+                {"id": 5, "chapter_id": 3, "file_size": 5000, "format": "mp3", "audio_url": "http://insecure.example/003.mp3"}
+              ]
+            }
+        """.trimIndent()
+
+        val files = QuranFoundationClient.parseChapterAudioFiles(json)
+        assertEquals(2, files.size)
+        assertEquals(1, files[0].chapterId)
+        assertEquals(2, files[1].chapterId)
+        assertEquals("https://audio.example/001.mp3", files[0].audioUrl)
+        assertEquals("https://audio.example/002.mp3", files[1].audioUrl)
+    }
+
+    @Test
     fun parsesChapterAudioAndAbsoluteWordSegments() {
         val json = """
             {
