@@ -345,6 +345,10 @@ fun QuranAudioPlayerBar(
                                 text = { Text("${source.reciterName} · ${source.style}") },
                                 onClick = {
                                     onSourceSelected(source)
+                                    if (controller.mediaItemCount > 0) {
+                                        val currentSurah = (controller.currentMediaItemIndex + 1).coerceIn(1, 114)
+                                        playQuranRecitation(controller, currentSurah, source)
+                                    }
                                     sourceMenuExpanded = false
                                 }
                             )
