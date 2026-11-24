@@ -193,108 +193,130 @@ private fun PageHeader(title: String, subtitle: String) {
 @Composable
 private fun HomeScreen(modifier: Modifier = Modifier, onNavigate: (Int) -> Unit) {
     PageColumn(modifier) {
-        Spacer(Modifier.height(22.dp))
+        Spacer(Modifier.height(26.dp))
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column {
-                Text("يَقِين", color = Gold, fontSize = 29.sp, fontWeight = FontWeight.Bold)
-                Text("رفيقك في القرآن والسنة", color = Muted, fontSize = 12.sp)
+                Text("يَقِين", color = Gold, fontSize = 30.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                Text("مساحة هادئة للقرآن والسنة", color = Muted, fontSize = 12.sp)
             }
-            Surface(shape = CircleShape, color = Panel) {
-                Icon(
-                    Icons.Outlined.NotificationsNone,
-                    contentDescription = "التنبيهات",
-                    tint = Gold,
-                    modifier = Modifier.padding(12.dp).size(23.dp)
-                )
+            Surface(shape = CircleShape, color = PanelSoft) {
+                Icon(Icons.Outlined.NotificationsNone, contentDescription = "التذكيرات", tint = Gold,
+                    modifier = Modifier.padding(13.dp).size(22.dp).clickable { onNavigate(4) })
             }
         }
-
         Spacer(Modifier.height(26.dp))
         Card(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(25.dp),
-            colors = CardDefaults.cardColors(containerColor = Panel)
+            shape = RoundedCornerShape(26.dp),
+            colors = CardDefaults.cardColors(containerColor = PanelSoft)
         ) {
-            Column(Modifier.padding(22.dp)) {
-                Text("الْقُرْآنُ الْكَرِيم", color = Gold, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.height(12.dp))
-                Text(
-                    "﴿ وَرَتِّلِ الْقُرْآنَ تَرْتِيلًا ﴾",
-                    color = MainText,
-                    fontSize = 23.sp,
-                    fontWeight = FontWeight.Medium
-                )
+            Column(Modifier.padding(horizontal = 22.dp, vertical = 23.dp)) {
+                Text("وَرَتِّلِ الْقُرْآنَ تَرْتِيلًا", color = MainText, fontSize = 23.sp,
+                    fontWeight = FontWeight.Medium, lineHeight = 39.sp)
                 Spacer(Modifier.height(8.dp))
-                Text("سورة المزمل · الآية ٤", color = Muted, fontSize = 11.sp)
-                Spacer(Modifier.height(17.dp))
-                Text("اقرأ المصحف أو استمع إلى تلاوات القراء", color = Muted, fontSize = 12.sp)
-                Spacer(Modifier.height(14.dp))
-                Button(
-                    onClick = { onNavigate(1) },
-                    colors = ButtonDefaults.buttonColors(containerColor = Emerald),
-                    shape = RoundedCornerShape(13.dp)
-                ) {
-                    Text("افتح القرآن الكريم", color = MainText)
+                Text("سورة المزمل · ٤", color = Gold, fontSize = 11.sp)
+                Spacer(Modifier.height(18.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Button(
+                        onClick = { onNavigate(1) },
+                        colors = ButtonDefaults.buttonColors(containerColor = Emerald),
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        Icon(Icons.Outlined.MenuBook, null, modifier = Modifier.size(17.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("متابعة القراءة")
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Text("المصحف الشريف", color = Muted, fontSize = 11.sp)
                 }
             }
         }
-
-        Spacer(Modifier.height(25.dp))
-        SectionHeading("استكشف يقين")
-        Spacer(Modifier.height(12.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Spacer(Modifier.height(29.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("استكشف يقين", color = MainText, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+            Text("المحتوى", color = Muted, fontSize = 11.sp)
+        }
+        Spacer(Modifier.height(14.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(11.dp)) {
+            FeatureCard(
+                modifier = Modifier.weight(1f),
+                icon = { Icon(Icons.Outlined.Headphones, null, tint = Gold) },
+                title = "استماع القرآن",
+                subtitle = "القراء والتلاوات",
+                onClick = { onNavigate(1) }
+            )
             FeatureCard(
                 modifier = Modifier.weight(1f),
                 icon = { Icon(Icons.Outlined.MenuBook, null, tint = Gold) },
-                title = "القرآن الكريم",
-                subtitle = "قراءة واستماع",
+                title = "قراءة القرآن",
+                subtitle = "السور والآيات",
+                onClick = { onNavigate(1) }
+            )
+        }
+        Spacer(Modifier.height(11.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(11.dp)) {
+            FeatureCard(
+                modifier = Modifier.weight(1f),
+                icon = { Icon(Icons.Outlined.AutoStories, null, tint = Gold) },
+                title = "قراءة واستماع",
+                subtitle = "المتابعة مع التلاوة",
                 onClick = { onNavigate(1) }
             )
             FeatureCard(
                 modifier = Modifier.weight(1f),
                 icon = { Icon(Icons.Outlined.LibraryBooks, null, tint = Gold) },
-                title = "السنة النبوية",
-                subtitle = "حديث ومصدر",
+                title = "الأحاديث",
+                subtitle = "البخاري ومسلم",
                 onClick = { onNavigate(2) }
             )
         }
-        Spacer(Modifier.height(10.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Spacer(Modifier.height(11.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(11.dp)) {
             FeatureCard(
                 modifier = Modifier.weight(1f),
-                icon = { Icon(Icons.Outlined.Bookmarks, null, tint = Gold) },
+                icon = { Icon(Icons.Outlined.WbTwilight, null, tint = Gold) },
                 title = "الأذكار",
-                subtitle = "أذكار مأثورة",
+                subtitle = "حصن المسلم",
                 onClick = { onNavigate(3) }
             )
             FeatureCard(
                 modifier = Modifier.weight(1f),
-                icon = { Icon(Icons.Outlined.MoreHoriz, null, tint = Gold) },
-                title = "المزيد",
-                subtitle = "عن يقين والتواصل",
+                icon = { Icon(Icons.Outlined.Spa, null, tint = Gold) },
+                title = "السنن المهجورة",
+                subtitle = "سنن بأدلتها",
                 onClick = { onNavigate(4) }
             )
         }
-
         Spacer(Modifier.height(25.dp))
-        SectionHeading("من هدي النبوة")
-        Spacer(Modifier.height(10.dp))
-        InfoCard(
-            title = "حديث اليوم",
-            body = "ستُعرض هنا أحاديث موثقة مع مصادرها وتخريجها بعد تجهيز قاعدة المحتوى ومراجعتها."
-        )
-        Spacer(Modifier.height(24.dp))
-        Text(
-            "يقين · نعمل ليكون المحتوى موثوقًا والتجربة هادئة",
-            modifier = Modifier.fillMaxWidth().padding(bottom = 22.dp),
-            color = Muted.copy(alpha = 0.7f),
-            fontSize = 10.sp,
-            textAlign = TextAlign.Center
-        )
+        Card(
+            modifier = Modifier.fillMaxWidth().clickable { onNavigate(4) },
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = Panel)
+        ) {
+            Row(Modifier.padding(17.dp), verticalAlignment = Alignment.CenterVertically) {
+                Surface(shape = RoundedCornerShape(13.dp), color = Emerald.copy(alpha = 0.16f)) {
+                    Icon(Icons.Outlined.NotificationsActive, null, tint = Gold,
+                        modifier = Modifier.padding(11.dp).size(22.dp))
+                }
+                Spacer(Modifier.width(13.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("التذكيرات", color = MainText, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                    Text("اضبط أوقات ما تحب المواظبة عليه", color = Muted, fontSize = 11.sp)
+                }
+                Icon(Icons.Outlined.ChevronLeft, null, tint = Muted)
+            }
+        }
+        Spacer(Modifier.height(25.dp))
+        Text("يقين", modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
+            color = Muted.copy(alpha = 0.55f), fontSize = 10.sp, textAlign = TextAlign.Center)
     }
 }
 
