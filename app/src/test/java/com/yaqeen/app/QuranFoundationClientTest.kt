@@ -106,6 +106,40 @@ class QuranFoundationClientTest {
         assertEquals("1:2", audio.timestamps[1].verseKey)
     }
 
+    @Test
+    fun resolvesActiveVerseAndWordFromAudioPosition() {
+        val audio = QFChapterAudio(
+            id = 1,
+            chapterId = 1,
+            audioUrl = "https://audio.example/001.mp3",
+            durationMs = 12_000L,
+            timestamps = listOf(
+                QFVerseTiming(
+                    verseKey = "1:1",
+                    startMs = 0,
+                    endMs = 6_000,
+                    segments = listOf(
+                        QFWordSegment(1, 100, 800),
+                        QFWordSegment(2, 900, 1_500)
+                    )
+                ),
+                QFVerseTiming(
+                    verseKey = "1:2",
+                    startMs = 6_000,
+                    endMs = 12_000,
+                    segments = listOf(QFWordSegment(1, 6_100, 6_800))
+                )
+            )
+        )
+
+        assertEquals(null, activeQuranPosition(audio, -1))
+        assertEquals(ActiveQuranPosition("1:1", null), activeQuranPosition(audio, 50))
+        assertEquals(ActiveQuranPosition("1:1", 1), activeQuranPosition(audio, 500))
+        assertEquals(ActiveQuranPosition("1:1", 2), activeQuranPosition(audio, 1_000))
+        assertEquals(ActiveQuranPosition("1:2", 1), activeQuranPosition(audio, 6_500))
+        assertEquals(null, activeQuranPosition(audio, 12_000))
+    }
+
     @Test(expected = IllegalArgumentException::class)
     fun rejectsNonHttpsAudioUrl() {
         QuranFoundationClient.parseChapterAudio(
