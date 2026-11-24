@@ -12,6 +12,11 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 
+internal fun normalizeSalawatIntervalHours(hours: Int): Int = hours.coerceIn(1, 24)
+
+internal fun salawatIntervalMillis(hours: Int): Long =
+    normalizeSalawatIntervalHours(hours) * 60L * 60L * 1000L
+
 internal object SalawatReminderScheduler {
     private const val PREFS = "salawat_reminder"
     private const val KEY_ENABLED = "enabled"
@@ -27,14 +32,14 @@ internal object SalawatReminderScheduler {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getInt(KEY_HOURS, 3)
 
     fun schedule(context: Context, hours: Int) {
-        val safeHours = hours.coerceIn(1, 24)
+        val safeHours = normalizeSalawatIntervalHours(hours)
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putBoolean(KEY_ENABLED, true)
             .putInt(KEY_HOURS, safeHours)
             .apply()
         createChannel(context)
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        val intervalMillis = safeHours * 60L * 60L * 1000L
+        val intervalMillis = salawatIntervalMillis(safeHours)
         val pendingIntent = reminderPendingIntent(context)
         alarmManager.cancel(pendingIntent)
         alarmManager.setInexactRepeating(
