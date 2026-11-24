@@ -62,6 +62,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.LayoutDirection
@@ -69,6 +70,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 private val Ink = Color(0xFF090E0B)
 private val Panel = Color(0xFF141D18)
@@ -553,17 +557,144 @@ private fun SunnahScreen(modifier: Modifier = Modifier) {
 
 @Composable
 private fun AdhkarScreen(modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val uriHandler = LocalUriHandler.current
+    val preferences = remember {
+        context.getSharedPreferences("yaqeen_adhkar_counts", android.content.Context.MODE_PRIVATE)
+    }
+    fun todayKey(): String = SimpleDateFormat("yyyyMMdd", Locale.US).format(Date())
+    fun loadCounts(date: String): Map<String, Int> =
+        verifiedAdhkarEntries.associate { entry ->
+            entry.id to preferences.getInt(adhkarStorageKey(date, entry.id), 0)
+        }
+
+    var dateKey by remember { mutableStateOf(todayKey()) }
+    var counts by remember(dateKey) { mutableStateOf(loadCounts(dateKey)) }
+    var selectedCategory by remember { mutableStateOf("morning") }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(60_000)
+            val today = todayKey()
+            if (today != dateKey) {
+                dateKey = today
+                counts = loadCounts(today)
+            }
+        }
+    }
+
+    val categories = listOf(
+        "morning" to "الصباح",
+        "evening" to "المساء",
+        "sleep" to "النوم"
+    )
+    val entries = verifiedAdhkarEntries.filter { it.category == selectedCategory }
+
     PageColumn(modifier) {
-        PageHeader("الأذكار", "أذكار مأثورة وتنبيهات تختارها بنفسك")
-        SimpleRow(Icons.Outlined.Bookmarks, "أذكار الصباح", "تنبيه اختياري في الوقت الذي تحدده")
-        SimpleRow(Icons.Outlined.Bookmarks, "أذكار المساء", "تنبيه اختياري في الوقت الذي تحدده")
-        SimpleRow(Icons.Outlined.Bookmarks, "أذكار النوم والاستيقاظ", "نصوص مأثورة ومصادرها")
-        SimpleRow(Icons.Outlined.NotificationsNone, "التنبيهات", "تفعيل كل تذكير أو إيقافه بصورة مستقلة")
-        SimpleRow(Icons.Outlined.PlayCircleOutline, "عداد الأذكار", "عداد لكل ذكر مع إمكانية ضبط العدد")
-        Spacer(Modifier.height(12.dp))
+        PageHeader("الأذكار", "أذكار مأثورة مع عدّاد يومي ومصادرها")
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            categories.forEach { (key, label) ->
+                TextButton(
+                    onClick = { selectedCategory = key },
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = if (selectedCategory == key) Gold else Muted
+                    )
+                ) {
+                    Text(label, fontWeight = if (selectedCategory == key) FontWeight.Bold else FontWeight.Normal)
+                }
+            }
+        }
+
+        entries.forEach { entry ->
+            val count = counts[entry.id] ?: 0
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = Panel)
+            ) {
+                Column(Modifier.padding(16.dp)) {
+                    Text(
+                        entry.text,
+                        color = MainText,
+                        fontSize = 20.sp,
+                        lineHeight = 36.sp,
+                        textAlign = TextAlign.Start
+                    )
+                    entry.note?.let {
+                        Spacer(Modifier.height(6.dp))
+                        Text(it, color = Muted, fontSize = 10.sp)
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("العدد: $count / ${entry.targetCount}", color = Gold, fontSize = 12.sp)
+                        Text(
+                            if (count >= entry.targetCount) "اكتمل" else "المتبقي: ${entry.targetCount - count}",
+                            color = Muted,
+                            fontSize = 11.sp
+                        )
+                    }
+                    Spacer(Modifier.height(7.dp))
+                    LinearProgressIndicator(
+                        progress = (count.toFloat() / entry.targetCount).coerceIn(0f, 1f),
+                        modifier = Modifier.fillMaxWidth(),
+                        color = Emerald,
+                        trackColor = Muted.copy(alpha = 0.22f)
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                val next = (counts[entry.id] ?: 0) + 1
+                                counts = counts + (entry.id to next)
+                                preferences.edit()
+                                    .putInt(adhkarStorageKey(dateKey, entry.id), next)
+                                    .apply()
+                            },
+                            enabled = count < entry.targetCount,
+                            colors = ButtonDefaults.buttonColors(containerColor = Emerald),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text(if (entry.targetCount == 1) "تم الذكر" else "سجّل ذكرًا")
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                counts = counts + (entry.id to 0)
+                                preferences.edit()
+                                    .remove(adhkarStorageKey(dateKey, entry.id))
+                                    .apply()
+                            },
+                            enabled = count > 0,
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text("إعادة")
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "المصدر: ${entry.sourceLabel}",
+                        modifier = Modifier.clickable { uriHandler.openUri(entry.sourceUrl) },
+                        color = Gold,
+                        fontSize = 10.sp
+                    )
+                }
+            }
+        }
+
+        Spacer(Modifier.height(8.dp))
         InfoCard(
-            title = "التذكيرات اختيارية",
-            body = "يمكنك اختيار أذكار الصباح والمساء وقيام الليل والورد القرآني وحديث اليوم وسنة اليوم، دون إشعارات مزعجة."
+            title = "مجموعة أولية موثقة",
+            body = "هذه الأذكار أُضيفت بعد مراجعة نصوصها ومراجعها في صحيح البخاري. العدّاد يُحفظ على الجهاز ويُصفّر مع بداية يوم جديد. التذكيرات والإشعارات الاختيارية لم تُفعّل بعد، ولن نضيف نصوصًا قبل التحقق من مصدرها."
         )
         Spacer(Modifier.height(22.dp))
     }
