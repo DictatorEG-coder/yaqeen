@@ -6,7 +6,8 @@
 
 - أنشئ تطبيقًا من نوع **Backend/server** في Quran Foundation Developer Console.
 - اطلب صلاحيات Content التي تحتاجها فقط. الإعداد الافتراضي هنا يطلب:
-  - `content.audio.read` (required for the current reciter and timing endpoints)
+  - `content.audio.read` (required for reciters, audio, and timing)
+  - `content.tafsirs.read` (required for the Arabic tafsir catalog and verse tafsir shown in the reader)
 - Add `content.quran.read` or `content.tafsirs.read` only when those API features are enabled and those scopes are approved.
 - لا تضع بيانات الاعتماد في GitHub أو في كود Android أو في المحادثة.
 - بيئة pre-live لا تحتوي إلا على الفاتحة والبقرة. لا تربطها بنسخة الإنتاج؛ يلزم اعتماد الوصول إلى production من Quran Foundation أولًا.
@@ -19,7 +20,7 @@
    `npx wrangler secret put QF_CLIENT_ID`
 3. ثم:
    `npx wrangler secret put QF_CLIENT_SECRET`
-4. اضبط `QF_SCOPE` و`QF_ENV` وفق الصلاحيات والبيئة التي اعتمدها Quran Foundation. لا تغيّر `QF_ENV` إلى production قبل موافقة الوصول الإنتاجي.
+4. اضبط `QF_SCOPE` و`QF_ENV` وفق الصلاحيات والبيئة التي اعتمدها Quran Foundation. يجب اعتماد `content.audio.read` و`content.tafsirs.read` للحزم الحالية؛ قد ترفض الواجهة الطلب إذا لم تمنح المنصة هذه الصلاحيات. لا تغيّر `QF_ENV` إلى production قبل موافقة الوصول الإنتاجي.
 5. عند الحصول على مفتاح Sunnah.com الرسمي، أضفه اختياريًا عبر `npx wrangler secret put SUNNAH_API_KEY`. لا تضعه في التطبيق أو المستودع.
 6. نفّذ:
    `npx wrangler deploy`
