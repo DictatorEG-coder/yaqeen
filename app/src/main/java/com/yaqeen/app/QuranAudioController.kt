@@ -188,6 +188,10 @@ internal val quranAudioSources = listOf(
     QuranAudioSource(
         "afasy", "مشاري راشد العفاسي", "تلاوة كاملة",
         "https://download.quranicaudio.com/quran/mishaari_raashid_al_3afaasee/"
+    ),
+    QuranAudioSource(
+        "luhaidan", "محمد اللحيدان", "مرتل · حفص عن عاصم",
+        "https://cdn.mp3quran.net/audio/muhammad-luhaidan/r1/"
     )
 )
 
@@ -203,6 +207,63 @@ internal fun surahNumberFromMediaId(mediaId: String?): Int? =
 
 internal fun minshawiMurattalUrl(surahNumber: Int): String =
     quranAudioUrl("minshawi_murattal", surahNumber)
+
+internal data class CuratedQuranTrack(
+    val sourceId: String,
+    val surahNumber: Int
+)
+
+internal data class CuratedQuranPlaylist(
+    val id: String,
+    val title: String,
+    val tracks: List<CuratedQuranTrack>
+)
+
+internal val curatedQuranPlaylists = listOf(
+    CuratedQuranPlaylist(
+        "classic_mix",
+        "مختارات قرآنية متنوعة",
+        listOf(
+            CuratedQuranTrack("abdulbaset_murattal", 2),
+            CuratedQuranTrack("abdulbaset_murattal", 12),
+            CuratedQuranTrack("minshawi_murattal", 53),
+            CuratedQuranTrack("minshawi_murattal", 50),
+            CuratedQuranTrack("minshawi_murattal", 90),
+            CuratedQuranTrack("luhaidan", 19)
+        )
+    ),
+    CuratedQuranPlaylist(
+        "juz_qad_sami",
+        "جزء قَدْ سَمِعَ · الحصري",
+        (58..66).map { CuratedQuranTrack("husary_radio", it) }
+    )
+)
+
+internal fun playCuratedQuranPlaylist(
+    controller: MediaController,
+    playlist: CuratedQuranPlaylist
+) {
+    require(playlist.tracks.isNotEmpty()) { "Curated playlist must contain tracks" }
+    val items = playlist.tracks.map { track ->
+        val source = quranAudioSources.firstOrNull { it.id == track.sourceId }
+            ?: throw IllegalArgumentException("Unknown Quran audio source: ${track.sourceId}")
+        require(track.surahNumber in 1..114) { "Surah number must be between 1 and 114" }
+        MediaItem.Builder()
+            .setMediaId("curated-${playlist.id}-${track.sourceId}-${track.surahNumber}")
+            .setUri(quranAudioUrl(track.sourceId, track.surahNumber))
+            .setMediaMetadata(
+                MediaMetadata.Builder()
+                    .setTitle(surahNames[track.surahNumber - 1])
+                    .setArtist("${source.reciterName} · ${source.style} · ${playlist.title}")
+                    .build()
+            )
+            .build()
+    }
+    controller.setMediaItems(items, 0, 0L)
+    controller.prepare()
+    controller.play()
+}
+
 
 internal fun playQuranFoundationPlaylist(
     controller: MediaController,
@@ -283,6 +344,7 @@ internal fun QuranAudioPlayerBar(
     var speedMenuExpanded by remember { mutableStateOf(false) }
     var timerMenuExpanded by remember { mutableStateOf(false) }
     var sourceMenuExpanded by remember { mutableStateOf(false) }
+    var curatedMenuExpanded by remember { mutableStateOf(false) }
     var artist by remember(controller) {
         mutableStateOf(controller.currentMediaItem?.mediaMetadata?.artist?.toString().orEmpty())
     }
@@ -392,6 +454,34 @@ internal fun QuranAudioPlayerBar(
                                         playQuranRecitation(controller, currentSurah, source)
                                     }
                                     sourceMenuExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Start
+            ) {
+                androidx.compose.foundation.layout.Box {
+                    TextButton(onClick = { curatedMenuExpanded = true }) {
+                        Text("تلاوات مختارة", color = AudioGold, fontSize = 11.sp)
+                    }
+                    DropdownMenu(
+                        expanded = curatedMenuExpanded,
+                        onDismissRequest = { curatedMenuExpanded = false }
+                    ) {
+                        curatedQuranPlaylists.forEach { playlist ->
+                            DropdownMenuItem(
+                                text = { Text(playlist.title) },
+                                onClick = {
+                                    playCuratedQuranPlaylist(controller, playlist)
+                                    val firstSource = quranAudioSources.firstOrNull {
+                                        it.id == playlist.tracks.first().sourceId
+                                    }
+                                    if (firstSource != null) onSourceSelected(firstSource)
+                                    curatedMenuExpanded = false
                                 }
                             )
                         }
