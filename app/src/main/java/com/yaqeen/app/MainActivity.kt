@@ -334,15 +334,30 @@ private fun SunnahScreen(modifier: Modifier = Modifier) {
 
     LaunchedEffect(client.isConfigured) {
         if (!client.isConfigured) return@LaunchedEffect
+        SunnahApiMemoryCache.getMetadata()?.let { cached ->
+            bukhari = cached.bukhari
+            muslim = cached.muslim
+            bukhariBooks = cached.bukhariBooks
+            muslimBooks = cached.muslimBooks
+            initialized = true
+            return@LaunchedEffect
+        }
         loading = true
         try {
-            bukhari = client.fetchCollection("bukhari")
+            val loadedBukhari = client.fetchCollection("bukhari")
             delay(650)
-            muslim = client.fetchCollection("muslim")
+            val loadedMuslim = client.fetchCollection("muslim")
             delay(650)
-            bukhariBooks = client.fetchBooks("bukhari").data
+            val loadedBukhariBooks = client.fetchBooks("bukhari").data
             delay(650)
-            muslimBooks = client.fetchBooks("muslim").data
+            val loadedMuslimBooks = client.fetchBooks("muslim").data
+            bukhari = loadedBukhari
+            muslim = loadedMuslim
+            bukhariBooks = loadedBukhariBooks
+            muslimBooks = loadedMuslimBooks
+            SunnahApiMemoryCache.putMetadata(
+                SunnahMetadataCache(loadedBukhari, loadedMuslim, loadedBukhariBooks, loadedMuslimBooks)
+            )
             error = null
         } catch (_: Exception) {
             error = "تعذّر الوصول إلى مصدر الحديث الرسمي. تحقق من إعداد الخادم ومفتاح الوصول."
@@ -357,7 +372,10 @@ private fun SunnahScreen(modifier: Modifier = Modifier) {
             loading = true
             error = null
             try {
-                val result = client.fetchBookHadiths(collection, book.bookNumber, page, 20)
+                val cached = SunnahApiMemoryCache.getHadithPage(collection, book.bookNumber, page)
+                val result = cached ?: client.fetchBookHadiths(collection, book.bookNumber, page, 20).also {
+                    SunnahApiMemoryCache.putHadithPage(collection, book.bookNumber, page, it)
+                }
                 hadiths = if (append) hadiths + result.data else result.data
                 nextHadithPage = result.nextPage
             } catch (_: Exception) {
