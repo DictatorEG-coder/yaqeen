@@ -158,6 +158,7 @@ private fun normalizeArabic(value: String): String {
 fun QuranReaderScreen(
     modifier: Modifier = Modifier,
     showBookmarksInitially: Boolean = false,
+    initialSurahNumber: Int = 0,
     onBookmarksOpened: () -> Unit = {}
 ) {
     val context = LocalContext.current
@@ -181,6 +182,16 @@ fun QuranReaderScreen(
 
     LaunchedEffect(showBookmarksInitially) {
         if (showBookmarksInitially) showBookmarks = true
+    }
+
+    LaunchedEffect(initialSurahNumber, loading, surahs.size) {
+        if (!loading && initialSurahNumber in 1..114) {
+            surahs.firstOrNull { it.number == initialSurahNumber }?.let { surah ->
+                selectedSurah = surah
+                selectedVerse = 1
+                showBookmarks = false
+            }
+        }
     }
 
     LaunchedEffect(Unit) {
