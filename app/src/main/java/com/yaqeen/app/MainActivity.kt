@@ -753,26 +753,6 @@ private fun MoreScreen(modifier: Modifier = Modifier, onOpenBookmarks: () -> Uni
     PageColumn(modifier) {
         PageHeader("المزيد", "إعدادات يقين ومعلومات التطبيق")
         SimpleRow(Icons.Outlined.Bookmarks, "المحفوظات", "الآيات المحفوظة من المصحف", onClick = onOpenBookmarks)
-        SectionHeading("تذكيرات يوم الجمعة")
-        Spacer(Modifier.height(10.dp))
-        FridayReminderCard(
-            kind = FridayReminderKind.KAHF,
-            title = "قراءة سورة الكهف",
-            description = "تذكير أسبوعي يوم الجمعة، ويفتح سورة الكهف مباشرة في المصحف.",
-            defaultHour = 9
-        )
-        FridaySalawatReminderCard()
-        FridayReminderCard(
-            kind = FridayReminderKind.HADITH,
-            title = "حديث يوم الجمعة",
-            description = "تذكير أسبوعي بحديث صحيح متعلق بفضل الجمعة وآدابها.",
-            defaultHour = 10
-        )
-        FridayHadithCard()
-        Spacer(Modifier.height(8.dp))
-        SectionHeading("تذكير عام")
-        Spacer(Modifier.height(8.dp))
-        SalawatReminderCard()
         SimpleRow(Icons.Outlined.MenuBook, "حول تطبيق يقين", "الرؤية والمصادر وحقوق المحتوى")
         Spacer(Modifier.height(14.dp))
         Card(
