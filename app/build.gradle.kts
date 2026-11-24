@@ -15,7 +15,7 @@ android {
         versionCode = 1
         versionName = "0.1.0"
         val qfProxyBaseUrl = providers.gradleProperty("QF_PROXY_BASE_URL").orElse("").get()
-        buildConfigField("String", "QF_PROXY_BASE_URL", "\"\${qfProxyBaseUrl}\"")
+        buildConfigField("String", "QF_PROXY_BASE_URL", "\"${qfProxyBaseUrl}\"")
     }
 
     buildFeatures {
