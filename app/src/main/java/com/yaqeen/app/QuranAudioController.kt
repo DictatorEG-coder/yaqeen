@@ -1,7 +1,8 @@
 package com.yaqeen.app
 
 import android.content.ComponentName
-import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,14 +11,18 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Pause
 import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material.icons.outlined.RepeatOne
 import androidx.compose.material.icons.outlined.SkipNext
 import androidx.compose.material.icons.outlined.SkipPrevious
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -38,6 +43,7 @@ import androidx.media3.common.AudioAttributes
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
+import androidx.media3.common.PlaybackParameters
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaController
 import androidx.media3.session.MediaSession
@@ -52,11 +58,34 @@ private val AudioGold = Color(0xFFD7C18A)
 private val AudioMuted = Color(0xFFAAB7AE)
 private val AudioWhite = Color(0xFFF1F3EF)
 
+internal fun sleepTimerDelayMs(minutes: Int): Long {
+    require(minutes in 1..180) { "Sleep timer must be between 1 and 180 minutes" }
+    return minutes.toLong() * 60_000L
+}
+
 class QuranPlaybackService : MediaSessionService() {
+    companion object {
+        @Volatile private var activeInstance: QuranPlaybackService? = null
+
+        fun scheduleSleepTimer(minutes: Int): Boolean {
+            if (minutes !in 1..180) return false
+            val service = activeInstance ?: return false
+            service.scheduleTimer(minutes)
+            return true
+        }
+
+        fun cancelSleepTimer() {
+            activeInstance?.cancelTimer()
+        }
+    }
+
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private var sleepTask: Runnable? = null
     private var mediaSession: MediaSession? = null
 
     override fun onCreate() {
         super.onCreate()
+        activeInstance = this
         val player = ExoPlayer.Builder(this).build()
         player.setAudioAttributes(AudioAttributes.DEFAULT, true)
         player.setHandleAudioBecomingNoisy(true)
@@ -65,9 +94,26 @@ class QuranPlaybackService : MediaSessionService() {
             .build()
     }
 
+    private fun scheduleTimer(minutes: Int) {
+        cancelTimer()
+        val task = Runnable {
+            mediaSession?.player?.pause()
+            sleepTask = null
+        }
+        sleepTask = task
+        mainHandler.postDelayed(task, sleepTimerDelayMs(minutes))
+    }
+
+    private fun cancelTimer() {
+        sleepTask?.let(mainHandler::removeCallbacks)
+        sleepTask = null
+    }
+
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = mediaSession
 
     override fun onDestroy() {
+        cancelTimer()
+        if (activeInstance === this) activeInstance = null
         mediaSession?.let { session ->
             session.player.release()
             session.release()
