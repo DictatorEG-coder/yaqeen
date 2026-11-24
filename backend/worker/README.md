@@ -20,10 +20,11 @@
 3. ثم:
    `npx wrangler secret put QF_CLIENT_SECRET`
 4. اضبط `QF_SCOPE` و`QF_ENV` وفق الصلاحيات والبيئة التي اعتمدها Quran Foundation. لا تغيّر `QF_ENV` إلى production قبل موافقة الوصول الإنتاجي.
-5. نفّذ:
+5. عند الحصول على مفتاح Sunnah.com الرسمي، أضفه اختياريًا عبر `npx wrangler secret put SUNNAH_API_KEY`. لا تضعه في التطبيق أو المستودع.
+6. نفّذ:
    `npx wrangler deploy`
-6. اختبر `/health`، ثم بعد تهيئة الاعتمادات اختبر `/api/quran/chapters`.
-7. بعد نجاح النشر، أضف عنوان Worker كمتغير مستودع GitHub باسم `QF_PROXY_BASE_URL` (ليس سرًا)، أو مرره محليًا كخاصية Gradle بالاسم نفسه. سيُضمَّن العنوان فقط في BuildConfig؛ لا تُضمَّن بيانات الاعتماد.
+7. اختبر `/health`، ثم بعد تهيئة الاعتمادات اختبر `/api/quran/chapters`.
+8. بعد نجاح النشر، أضف عنوان Worker كمتغير مستودع GitHub باسم `QF_PROXY_BASE_URL` (ليس سرًا)، أو مرره محليًا كخاصية Gradle بالاسم نفسه. سيُضمَّن العنوان فقط في BuildConfig؛ لا تُضمَّن بيانات الاعتماد.
 
 ## المسارات المتاحة
 
@@ -39,6 +40,8 @@
 - `/api/quran/tafsirs/...`
 - `/api/quran/translations/...`
 - `/api/quran/search/...`
+- `/api/sunnah/collections` و`/api/sunnah/collections/{name}/books/...`
+- `/api/sunnah/hadiths/...`
 
 يحفظ Worker رمز OAuth2 في ذاكرة الـisolate حتى يقترب من انتهاء صلاحيته، ويعيد طلبه مرة واحدة عند استجابة 401. لا يسجل الرمز ولا يعيده للعميل.
 - قبل مشاركة عنوان Worker مع التطبيق، فعّل Cloudflare Rate Limiting على المسارات `/api/quran/*` (مثل حدّ طلبات مناسب لكل IP)، وراقب استهلاك API. الواجهة للقراءة فقط ولا تقبل POST/PUT/DELETE، لكن عنوان Worker عام وليس سرًا.
@@ -50,5 +53,7 @@
 - لم يُربط تطبيق Android بعنوان Worker بعد.
 - لم تُختبر صلاحيات production أو بياناتها.
 - يلزم التحقق من endpoint الفعلي لتوقيت الآيات/الكلمات ومن تغطية كل تسجيل قبل تشغيل التظليل المتزامن.
+
+Sunnah.com API يحتاج مفتاحًا رسميًا يُطلب من [مستودعهم](https://github.com/sunnah-com/api/issues/new?template=request-for-api-access.md&title=Request+for+API+access). واجهتهم الرسمية تنص على أن البيانات المتاحة جزء من corpus ويُضاف المزيد بعد المراجعة اليدوية؛ يجب مقارنة `totalAvailableHadith` مع `totalHadith` لكل مجموعة/كتاب قبل وصف البخاري أو مسلم بأنه كامل. لا تُعرض المجموعة كاملة إذا كانت الأعداد غير متطابقة.
 
 لا تعتبر هذه الملفات خادمًا منشورًا أو تكاملًا مكتملًا قبل تنفيذ خطوات النشر والاختبار.
