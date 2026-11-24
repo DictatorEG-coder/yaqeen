@@ -1,0 +1,8 @@
+name = "yaqeen-content-proxy"
+main = "src/index.js"
+compatibility_date = "2026-11-24"
+workers_dev = true
+
+[vars]
+QF_ENV = "prelive"
+QF_SCOPE = "content.quran.read content.audio.read content.tafsirs.read"
