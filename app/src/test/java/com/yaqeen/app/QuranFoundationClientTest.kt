@@ -1,0 +1,100 @@
+package com.yaqeen.app
+
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class QuranFoundationClientTest {
+
+    @Test
+    fun parsesChapterReciterCatalog() {
+        val json = """
+            {
+              "reciters": [
+                {
+                  "id": 3,
+                  "name": "Abu Bakr al-Shatri",
+                  "style": {"name": "Murattal", "language_name": "english"},
+                  "qirat": {"name": "Hafs", "language_name": "english"},
+                  "translated_name": {"name": "أبو بكر الشاطري", "language_name": "arabic"}
+                },
+                {
+                  "id": 4,
+                  "name": "Another Reciter",
+                  "style": {"name": null},
+                  "qirat": {"name": "Warsh"}
+                },
+                {"id": 0, "name": "Invalid"}
+              ]
+            }
+        """.trimIndent()
+
+        val reciters = QuranFoundationClient.parseChapterReciters(json)
+        assertEquals(2, reciters.size)
+        assertEquals(3, reciters[0].id)
+        assertEquals("Murattal", reciters[0].style)
+        assertEquals("Hafs", reciters[0].qirat)
+        assertEquals("أبو بكر الشاطري", reciters[0].translatedName)
+        assertEquals(null, reciters[1].style)
+        assertEquals("Warsh", reciters[1].qirat)
+    }
+
+    @Test
+    fun parsesChapterAudioAndAbsoluteWordSegments() {
+        val json = """
+            {
+              "audio_file": {
+                "id": 457,
+                "chapter_id": 1,
+                "file_size": 710784,
+                "format": "mp3",
+                "audio_url": "https://download.example.org/audio/001.mp3",
+                "duration": 53000,
+                "timestamps": [
+                  {
+                    "verse_key": "1:1",
+                    "timestamp_from": 0,
+                    "timestamp_to": 6493,
+                    "duration": 6493,
+                    "segments": [[1, 120, 810], [2, 820, 1510], [0, 200, 300], [3, 7000, 7100]]
+                  },
+                  {
+                    "verse_key": "1:2",
+                    "timestamp_from": 6500,
+                    "timestamp_to": 12000,
+                    "segments": [[1, 6600, 7100]]
+                  }
+                ]
+              }
+            }
+        """.trimIndent()
+
+        val audio = QuranFoundationClient.parseChapterAudio(json)
+        assertEquals(457, audio.id)
+        assertEquals(1, audio.chapterId)
+        assertEquals("https://download.example.org/audio/001.mp3", audio.audioUrl)
+        assertEquals(53_000L, audio.durationMs)
+        assertEquals(2, audio.timestamps.size)
+        assertEquals("1:1", audio.timestamps[0].verseKey)
+        assertEquals(2, audio.timestamps[0].segments.size)
+        assertEquals(1, audio.timestamps[0].segments[0].wordIndex)
+        assertEquals(120, audio.timestamps[0].segments[0].startMs)
+        assertEquals(1510, audio.timestamps[0].segments[1].endMs)
+        assertEquals("1:2", audio.timestamps[1].verseKey)
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun rejectsNonHttpsAudioUrl() {
+        QuranFoundationClient.parseChapterAudio(
+            """{"audio_file":{"audio_url":"http://unsafe.example.org/1.mp3","timestamps":[]}}"""
+        )
+    }
+
+    @Test
+    fun proxyConfigurationRequiresHttps() {
+        assertTrue(QuranFoundationClient("https://yaqeen.example.workers.dev").isConfigured)
+        assertFalse(QuranFoundationClient("").isConfigured)
+        assertFalse(QuranFoundationClient("http://insecure.example").isConfigured)
+    }
+}
