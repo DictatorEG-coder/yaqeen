@@ -353,7 +353,7 @@ private fun MoreScreen(modifier: Modifier = Modifier, onOpenBookmarks: () -> Uni
     val context = LocalContext.current
     PageColumn(modifier) {
         PageHeader("المزيد", "إعدادات يقين ومعلومات التطبيق")
-        SimpleRow(Icons.Outlined.Bookmarks, "المحفوظات", "الآيات والأحاديث والمواضع المفضلة", onClick = onOpenBookmarks)
+        SimpleRow(Icons.Outlined.Bookmarks, "المحفوظات", "الآيات المحفوظة من المصحف", onClick = onOpenBookmarks)
         SimpleRow(Icons.Outlined.NotificationsNone, "إعدادات التنبيهات", "اختيار أنواع التذكيرات وأوقاتها")
         SimpleRow(Icons.Outlined.MenuBook, "حول تطبيق يقين", "الرؤية والمصادر وحقوق المحتوى")
         Spacer(Modifier.height(14.dp))
