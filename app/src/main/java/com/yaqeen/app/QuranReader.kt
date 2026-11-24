@@ -23,6 +23,7 @@ import androidx.compose.material.icons.outlined.Bookmark
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.PlayCircleOutline
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -71,7 +72,7 @@ internal val expectedVerseCounts = listOf(
     8, 3, 9, 5, 4, 7, 3, 6, 3, 5, 4, 5, 6
 )
 
-private val surahNames = listOf(
+internal val surahNames = listOf(
     "الفاتحة", "البقرة", "آل عمران", "النساء", "المائدة", "الأنعام", "الأعراف", "الأنفال",
     "التوبة", "يونس", "هود", "يوسف", "الرعد", "إبراهيم", "الحجر", "النحل", "الإسراء",
     "الكهف", "مريم", "طه", "الأنبياء", "الحج", "المؤمنون", "النور", "الفرقان", "الشعراء",
@@ -154,6 +155,7 @@ fun QuranReaderScreen(
 ) {
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
+    val mediaController = rememberQuranMediaController()
     var surahs by remember { mutableStateOf<List<QuranSurah>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var loadError by remember { mutableStateOf(false) }
@@ -305,10 +307,17 @@ fun QuranReaderScreen(
                     Text(current.name, color = QuranGold, fontSize = 22.sp, fontWeight = FontWeight.Bold)
                     Text("سورة رقم ${current.number} · ${current.verses.size} آية", color = QuranMuted, fontSize = 11.sp)
                 }
+                IconButton(
+                    enabled = mediaController != null,
+                    onClick = { mediaController?.let { playMinshawiMurattal(it, current.number) } }
+                ) {
+                    Icon(Icons.Outlined.PlayCircleOutline, contentDescription = "استماع للسورة", tint = QuranGold)
+                }
                 IconButton(onClick = { showBookmarks = true }) {
                     Icon(Icons.Outlined.BookmarkBorder, contentDescription = "المحفوظات", tint = QuranGold)
                 }
             }
+            QuranAudioPlayerBar(mediaController, Modifier.padding(bottom = 10.dp))
             LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
                 if (current.number != 1 && current.number != 9) {
                     openingBasmala(current.verses.firstOrNull() ?: QuranVerse(0, ""))?.let { basmala ->
@@ -389,7 +398,8 @@ fun QuranReaderScreen(
                 Icon(Icons.Outlined.BookmarkBorder, contentDescription = "المحفوظات", tint = QuranGold)
             }
         }
-        Text("مصحف كامل · ١١٤ سورة · ٦٢٣٦ آية", modifier = Modifier.padding(top = 5.dp, bottom = 16.dp), color = QuranMuted, fontSize = 12.sp)
+        Text("مصحف كامل · ١١٤ سورة · ٦٢٣٦ آية", modifier = Modifier.padding(top = 5.dp, bottom = 8.dp), color = QuranMuted, fontSize = 12.sp)
+        QuranAudioPlayerBar(mediaController, Modifier.padding(bottom = 10.dp))
         OutlinedTextField(
             value = search,
             onValueChange = { search = it },
@@ -467,7 +477,15 @@ fun QuranReaderScreen(
                                         Text("سورة رقم ${surah.number}", color = QuranMuted, fontSize = 10.sp)
                                     }
                                 }
-                                Text("${surah.verses.size} آية", color = QuranMuted, fontSize = 11.sp)
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text("${surah.verses.size} آية", color = QuranMuted, fontSize = 11.sp)
+                                    IconButton(
+                                        enabled = mediaController != null,
+                                        onClick = { mediaController?.let { playMinshawiMurattal(it, surah.number) } }
+                                    ) {
+                                        Icon(Icons.Outlined.PlayCircleOutline, contentDescription = "استماع لسورة ${surah.name}", tint = QuranGold)
+                                    }
+                                }
                             }
                         }
                     }
