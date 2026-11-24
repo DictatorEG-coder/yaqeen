@@ -38,6 +38,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -103,6 +104,7 @@ private fun normalizeArabic(value: String): String {
 @Composable
 fun QuranReaderScreen(modifier: Modifier = Modifier) {
     val context = LocalContext.current
+    val uriHandler = LocalUriHandler.current
     var surahs by remember { mutableStateOf<List<QuranSurah>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var loadError by remember { mutableStateOf(false) }
@@ -198,7 +200,8 @@ fun QuranReaderScreen(modifier: Modifier = Modifier) {
                 item {
                     Text(
                         "النص بالرسم العثماني من مشروع تنزيل (Tanzil).",
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 18.dp),
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 18.dp)
+                            .clickable { uriHandler.openUri("https://tanzil.net") },
                         color = QuranMuted,
                         fontSize = 10.sp,
                         textAlign = TextAlign.Center
