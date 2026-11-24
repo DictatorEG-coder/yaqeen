@@ -2,10 +2,14 @@ package com.yaqeen.app
 
 import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
+import android.os.Build
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -707,7 +711,7 @@ private fun MoreScreen(modifier: Modifier = Modifier, onOpenBookmarks: () -> Uni
     PageColumn(modifier) {
         PageHeader("المزيد", "إعدادات يقين ومعلومات التطبيق")
         SimpleRow(Icons.Outlined.Bookmarks, "المحفوظات", "الآيات المحفوظة من المصحف", onClick = onOpenBookmarks)
-        SimpleRow(Icons.Outlined.NotificationsNone, "إعدادات التنبيهات", "اختيار أنواع التذكيرات وأوقاتها")
+        SalawatReminderCard()
         SimpleRow(Icons.Outlined.MenuBook, "حول تطبيق يقين", "الرؤية والمصادر وحقوق المحتوى")
         Spacer(Modifier.height(14.dp))
         Card(
@@ -774,6 +778,99 @@ private fun MoreScreen(modifier: Modifier = Modifier, onOpenBookmarks: () -> Uni
             textAlign = TextAlign.Center
         )
     }
+}
+
+@Composable
+private fun SalawatReminderCard() {
+    val context = LocalContext.current
+    var enabled by remember { mutableStateOf(SalawatReminderScheduler.isEnabled(context)) }
+    var intervalHours by remember { mutableIntStateOf(SalawatReminderScheduler.intervalHours(context)) }
+    var permissionDenied by remember { mutableStateOf(false) }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        permissionDenied = !granted
+        if (granted) {
+            SalawatReminderScheduler.schedule(context, intervalHours)
+            enabled = true
+        }
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = Panel)
+    ) {
+        Column(Modifier.padding(18.dp)) {
+            Text("تذكير: صلِّ على النبي ﷺ", color = Gold, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(7.dp))
+            Text(
+                "فعّل تذكيرًا اختياريًا يصلك على هاتفك كل فترة تختارها.",
+                color = Muted,
+                fontSize = 12.sp,
+                lineHeight = 20.sp
+            )
+            Spacer(Modifier.height(13.dp))
+            Text("التذكير كل:", color = MainText, fontSize = 13.sp)
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                listOf(1, 2, 3, 4, 6, 8, 12).forEach { hours ->
+                    OutlinedButton(
+                        onClick = {
+                            intervalHours = hours
+                            if (enabled) SalawatReminderScheduler.schedule(context, hours)
+                        },
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 5.dp)
+                    ) {
+                        Text(
+                            "$hours س",
+                            color = if (intervalHours == hours) Gold else Muted,
+                            fontSize = 11.sp
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+            if (enabled) {
+                Button(
+                    onClick = {
+                        SalawatReminderScheduler.cancel(context)
+                        enabled = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = PanelSoft)
+                ) { Text("إيقاف التذكير", color = MainText) }
+            } else {
+                Button(
+                    onClick = {
+                        if (Build.VERSION.SDK_INT >= 33 &&
+                            context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+                        ) {
+                            permissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                        } else {
+                            SalawatReminderScheduler.schedule(context, intervalHours)
+                            enabled = true
+                            permissionDenied = false
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Emerald)
+                ) { Text("تفعيل التذكير", color = MainText) }
+            }
+            if (permissionDenied) {
+                Spacer(Modifier.height(6.dp))
+                Text("لم يتم منح إذن الإشعارات؛ لن تظهر التذكيرات حتى تسمح بها من إعدادات الهاتف.", color = Gold, fontSize = 11.sp)
+            }
+            Spacer(Modifier.height(7.dp))
+            Text(
+                "التذكير اختياري ويمكن إيقافه في أي وقت. قد يختلف موعد وصوله قليلًا لتوفير البطارية.",
+                color = Muted,
+                fontSize = 10.sp,
+                lineHeight = 17.sp
+            )
+        }
+    }
+    Spacer(Modifier.height(14.dp))
 }
 
 @Composable
