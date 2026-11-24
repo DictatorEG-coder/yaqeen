@@ -122,7 +122,7 @@ private fun YaqeenApp() {
                         modifier = Modifier.padding(padding),
                         onNavigate = { selectedTab = it }
                     )
-                    1 -> QuranScreen(Modifier.padding(padding))
+                    1 -> QuranReaderScreen(Modifier.padding(padding))
                     2 -> SunnahScreen(Modifier.padding(padding))
                     3 -> AdhkarScreen(Modifier.padding(padding))
                     else -> MoreScreen(Modifier.padding(padding))
