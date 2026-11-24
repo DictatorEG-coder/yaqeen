@@ -50,7 +50,10 @@ internal class QuranFoundationClient(
 ) {
     private val normalizedBaseUrl = baseUrl.trim().trimEnd('/')
     val isConfigured: Boolean
-        get() = normalizedBaseUrl.startsWith("https://")
+        get() = runCatching {
+            val parsed = URL(normalizedBaseUrl)
+            parsed.protocol.equals("https", ignoreCase = true) && parsed.host.isNotBlank()
+        }.getOrDefault(false)
 
     suspend fun fetchChapterReciters(): List<QFChapterReciter> {
         val body = getJson("/api/quran/resources/chapter_reciters?language=ar")
