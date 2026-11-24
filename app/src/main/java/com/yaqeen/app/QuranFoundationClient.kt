@@ -37,6 +37,11 @@ internal data class QFVerseTiming(
     val segments: List<QFWordSegment>
 )
 
+internal data class ActiveQuranPosition(
+    val verseKey: String,
+    val wordIndex: Int?
+)
+
 internal data class QFChapterAudio(
     val id: Int,
     val chapterId: Int,
@@ -44,6 +49,20 @@ internal data class QFChapterAudio(
     val durationMs: Long?,
     val timestamps: List<QFVerseTiming>
 )
+
+internal fun activeQuranPosition(
+    audio: QFChapterAudio,
+    positionMs: Long
+): ActiveQuranPosition? {
+    if (positionMs < 0L) return null
+    val verse = audio.timestamps.firstOrNull {
+        positionMs >= it.startMs && positionMs < it.endMs
+    } ?: return null
+    val word = verse.segments.firstOrNull {
+        positionMs >= it.startMs && positionMs < it.endMs
+    }
+    return ActiveQuranPosition(verse.verseKey, word?.wordIndex)
+}
 
 internal class QuranFoundationClient(
     baseUrl: String = BuildConfig.QF_PROXY_BASE_URL
