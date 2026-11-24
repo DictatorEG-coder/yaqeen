@@ -815,7 +815,7 @@ private fun SalawatReminderCard() {
             Text("التذكير كل:", color = MainText, fontSize = 13.sp)
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                listOf(1, 2, 3, 4, 6, 8, 12).forEach { hours ->
+                listOf(1, 2, 3, 4, 6, 8, 12, 24).forEach { hours ->
                     OutlinedButton(
                         onClick = {
                             intervalHours = hours
