@@ -60,6 +60,13 @@ internal fun nextFridaySalawatAt(
     val now = Calendar.getInstance().apply { timeInMillis = nowMillis }
     val safeInterval = intervalHours.coerceIn(1, 12)
     if (now.get(Calendar.DAY_OF_WEEK) == Calendar.FRIDAY) {
+        val startToday = (now.clone() as Calendar).apply {
+            set(Calendar.HOUR_OF_DAY, startHour.coerceIn(0, 23))
+            set(Calendar.MINUTE, startMinute.coerceIn(0, 59))
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+        if (nowMillis < startToday.timeInMillis) return startToday.timeInMillis
         val next = (now.clone() as Calendar).apply { add(Calendar.HOUR_OF_DAY, safeInterval) }
         val endOfFriday = (now.clone() as Calendar).apply {
             set(Calendar.HOUR_OF_DAY, 23); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
