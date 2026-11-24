@@ -87,8 +87,8 @@ internal object FridayReminderScheduler {
     fun isEnabled(context: Context, kind: FridayReminderKind): Boolean =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(key(kind, "enabled"), false)
 
-    fun hour(context: Context, kind: FridayReminderKind): Int =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getInt(key(kind, "hour"), 9)
+    fun hour(context: Context, kind: FridayReminderKind, defaultHour: Int = 9): Int =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getInt(key(kind, "hour"), defaultHour.coerceIn(0, 23))
 
     fun minute(context: Context, kind: FridayReminderKind): Int =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getInt(key(kind, "minute"), 0)
