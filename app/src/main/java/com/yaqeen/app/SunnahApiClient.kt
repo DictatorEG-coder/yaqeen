@@ -68,6 +68,48 @@ internal data class SunnahPage<T>(
     val nextPage: Int?
 )
 
+internal data class SunnahMetadataCache(
+    val bukhari: SunnahCollection,
+    val muslim: SunnahCollection,
+    val bukhariBooks: List<SunnahBook>,
+    val muslimBooks: List<SunnahBook>
+)
+
+internal object SunnahApiMemoryCache {
+    private const val TTL_MS = 6 * 60 * 60 * 1000L
+    private var metadata: Pair<Long, SunnahMetadataCache>? = null
+    private val hadithPages = mutableMapOf<String, Pair<Long, SunnahPage<SunnahHadith>>>()
+
+    @Synchronized
+    fun getMetadata(): SunnahMetadataCache? {
+        val cached = metadata ?: return null
+        return if (System.currentTimeMillis() - cached.first < TTL_MS) cached.second else null
+    }
+
+    @Synchronized
+    fun putMetadata(value: SunnahMetadataCache) {
+        metadata = System.currentTimeMillis() to value
+    }
+
+    @Synchronized
+    fun getHadithPage(collection: String, bookNumber: String, page: Int): SunnahPage<SunnahHadith>? {
+        val key = "$collection/$bookNumber/$page"
+        val cached = hadithPages[key] ?: return null
+        return if (System.currentTimeMillis() - cached.first < TTL_MS) cached.second else null
+    }
+
+    @Synchronized
+    fun putHadithPage(
+        collection: String,
+        bookNumber: String,
+        page: Int,
+        value: SunnahPage<SunnahHadith>
+    ) {
+        val key = "$collection/$bookNumber/$page"
+        hadithPages[key] = System.currentTimeMillis() to value
+    }
+}
+
 internal class SunnahApiClient(
     baseUrl: String = BuildConfig.QF_PROXY_BASE_URL
 ) {
