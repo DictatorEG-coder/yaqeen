@@ -144,6 +144,31 @@ class SunnahApiClientTest {
     }
 
     @Test
+    fun parsesHadithComparisonAndMissingReferences() {
+        val comparison = SunnahApiClient.parseHadithComparison(
+            """
+            {
+              "count": 1,
+              "missing": ["muslim:999999"],
+              "data": [
+                {
+                  "collection": "bukhari",
+                  "bookNumber": "1",
+                  "chapterId": "1",
+                  "hadithNumber": "1",
+                  "hadith": [{"lang": "ar", "body": "رواية البخاري"}],
+                  "grades": []
+                }
+              ]
+            }
+            """.trimIndent()
+        )
+        assertEquals(1, comparison.hadiths.size)
+        assertEquals("رواية البخاري", comparison.hadiths.single().arabicText)
+        assertEquals(listOf("muslim:999999"), comparison.missingReferences)
+    }
+
+    @Test
     fun proxyUrlMustUseHttps() {
         assertTrue(SunnahApiClient("https://yaqeen.example.workers.dev").isConfigured)
         assertFalse(SunnahApiClient("").isConfigured)
