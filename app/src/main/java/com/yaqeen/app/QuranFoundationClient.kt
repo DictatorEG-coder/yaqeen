@@ -8,6 +8,20 @@ import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
 
+internal data class QFTafsirResource(
+    val id: Int,
+    val name: String,
+    val authorName: String?,
+    val languageName: String
+)
+
+internal data class QFTafsirEntry(
+    val verseKey: String,
+    val resourceName: String,
+    val authorName: String?,
+    val text: String
+)
+
 internal data class QFChapterReciter(
     val id: Int,
     val name: String,
@@ -74,6 +88,18 @@ internal class QuranFoundationClient(
             parsed.protocol.equals("https", ignoreCase = true) && parsed.host.isNotBlank()
         }.getOrDefault(false)
 
+    suspend fun fetchArabicTafsirResources(): List<QFTafsirResource> {
+        val body = getJson("/api/quran/resources/tafsirs?language=ar")
+        return parseTafsirResources(body).filter { it.languageName.equals("arabic", true) }
+    }
+
+    suspend fun fetchTafsirForVerse(resourceId: Int, verseKey: String): QFTafsirEntry {
+        require(resourceId > 0) { "Tafsir resource ID must be positive" }
+        require(verseKey.matches(Regex("^\\d{1,3}:\\d{1,3}$"))) { "Invalid verse key" }
+        val body = getJson("/api/quran/tafsirs/$resourceId/by_ayah/$verseKey")
+        return parseTafsirForVerse(body, verseKey)
+    }
+
     suspend fun fetchChapterReciters(): List<QFChapterReciter> {
         val body = getJson("/api/quran/resources/chapter_reciters?language=ar")
         return parseChapterReciters(body)
@@ -128,6 +154,45 @@ internal class QuranFoundationClient(
         private fun JSONObject.readNonBlankString(key: String): String? {
             if (isNull(key)) return null
             return optString(key).trim().takeIf { it.isNotEmpty() && it != "null" }
+        }
+
+        internal fun parseTafsirResources(json: String): List<QFTafsirResource> {
+            val array = JSONObject(json).optJSONArray("tafsirs")
+                ?: throw IllegalArgumentException("Missing tafsirs array")
+            return buildList {
+                for (index in 0 until array.length()) {
+                    val item = array.optJSONObject(index) ?: continue
+                    val id = item.optInt("id", 0)
+                    val name = item.optString("name", "").trim()
+                    val language = item.optString("language_name", "").trim()
+                    if (id > 0 && name.isNotBlank() && language.isNotBlank()) {
+                        add(
+                            QFTafsirResource(
+                                id,
+                                name,
+                                item.optString("author_name").takeIf { it.isNotBlank() && it != "null" },
+                                language
+                            )
+                        )
+                    }
+                }
+            }
+        }
+
+        internal fun parseTafsirForVerse(json: String, requestedVerseKey: String): QFTafsirEntry {
+            val root = JSONObject(json)
+            val tafsirObject = root.optJSONObject("tafsir") ?: root
+            val verses = tafsirObject.optJSONObject("verses")
+                ?: throw IllegalArgumentException("Missing tafsir verses")
+            val record = verses.optJSONObject(requestedVerseKey)
+                ?: throw IllegalArgumentException("Tafsir for requested verse is missing")
+            val text = record.optString("text", "").trim()
+            require(text.isNotBlank()) { "Tafsir text is empty" }
+            val translated = record.optJSONObject("translated_name")
+            val resourceName = translated?.optString("name")?.takeIf { it.isNotBlank() && it != "null" }
+                ?: record.optString("resource_name", "التفسير")
+            val authorName = record.optString("author_name").takeIf { it.isNotBlank() && it != "null" }
+            return QFTafsirEntry(requestedVerseKey, resourceName, authorName, text)
         }
 
         internal fun parseChapterReciters(json: String): List<QFChapterReciter> {
