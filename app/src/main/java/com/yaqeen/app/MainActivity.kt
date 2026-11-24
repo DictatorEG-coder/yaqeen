@@ -477,6 +477,9 @@ private fun SunnahScreen(modifier: Modifier = Modifier) {
             if (loading) {
                 Text("جارٍ التحميل…", color = Muted, modifier = Modifier.padding(12.dp))
             }
+            if (error != null) {
+                InfoCard("تعذّر تحميل الأحاديث", error ?: "")
+            }
             nextHadithPage?.let { page ->
                 Button(
                     onClick = { loadHadithPage(collection, book, page, true) },
@@ -534,7 +537,7 @@ private fun SunnahScreen(modifier: Modifier = Modifier) {
                     onClick = { selectedCollection = "muslim" }
                 )
             }
-            if (error != null && initialized) {
+            if (error != null && (bukhari != null || muslim != null)) {
                 InfoCard("ملاحظة من المصدر", error ?: "")
             }
             if (bukhari != null || muslim != null) {
