@@ -34,6 +34,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.media3.common.AudioAttributes
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
@@ -57,6 +58,8 @@ class QuranPlaybackService : MediaSessionService() {
     override fun onCreate() {
         super.onCreate()
         val player = ExoPlayer.Builder(this).build()
+        player.setAudioAttributes(AudioAttributes.DEFAULT, true)
+        player.setHandleAudioBecomingNoisy(true)
         mediaSession = MediaSession.Builder(this, player)
             .setId("yaqeen-quran-player")
             .build()
