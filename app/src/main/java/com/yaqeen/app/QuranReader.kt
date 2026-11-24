@@ -490,7 +490,7 @@ fun QuranReaderScreen(
                 }
             }
         }
-        QuranAudioPlayerBar(mediaController, Modifier.padding(bottom = 10.dp))
+        QuranAudioPlayerBar(mediaController, selectedAudioSource, { selectedAudioSource = it }, Modifier.padding(bottom = 10.dp))
         OutlinedTextField(
             value = search,
             onValueChange = { search = it },
