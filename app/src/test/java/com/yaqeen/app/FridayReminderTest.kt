@@ -24,7 +24,7 @@ class FridayReminderTest {
         }
         val result = Calendar.getInstance().apply { timeInMillis = nextFridayAt(friday.timeInMillis, 9, 0) }
         assertEquals(Calendar.FRIDAY, result.get(Calendar.DAY_OF_WEEK))
-        assertEquals(7, ((result.timeInMillis - friday.timeInMillis) / (24L * 60L * 60L * 1000L)).toInt())
+        assertEquals(4, result.get(Calendar.DAY_OF_MONTH))
         assertEquals(9, result.get(Calendar.HOUR_OF_DAY))
     }
 
