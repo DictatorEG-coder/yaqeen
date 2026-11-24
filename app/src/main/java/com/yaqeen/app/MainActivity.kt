@@ -82,6 +82,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun YaqeenApp() {
     var selectedTab by remember { mutableIntStateOf(0) }
+    var openBookmarksRequested by remember { mutableStateOf(false) }
     MaterialTheme {
         androidx.compose.runtime.CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
             Scaffold(
@@ -122,10 +123,17 @@ private fun YaqeenApp() {
                         modifier = Modifier.padding(padding),
                         onNavigate = { selectedTab = it }
                     )
-                    1 -> QuranReaderScreen(Modifier.padding(padding))
+                    1 -> QuranReaderScreen(
+                        modifier = Modifier.padding(padding),
+                        showBookmarksInitially = openBookmarksRequested,
+                        onBookmarksOpened = { openBookmarksRequested = false }
+                    )
                     2 -> SunnahScreen(Modifier.padding(padding))
                     3 -> AdhkarScreen(Modifier.padding(padding))
-                    else -> MoreScreen(Modifier.padding(padding))
+                    else -> MoreScreen(
+                        modifier = Modifier.padding(padding),
+                        onOpenBookmarks = { selectedTab = 1; openBookmarksRequested = true }
+                    )
                 }
             }
         }
@@ -340,11 +348,11 @@ private fun AdhkarScreen(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun MoreScreen(modifier: Modifier = Modifier) {
+private fun MoreScreen(modifier: Modifier = Modifier, onOpenBookmarks: () -> Unit) {
     val context = LocalContext.current
     PageColumn(modifier) {
         PageHeader("المزيد", "إعدادات يقين ومعلومات التطبيق")
-        SimpleRow(Icons.Outlined.Bookmarks, "المحفوظات", "الآيات والأحاديث والمواضع المفضلة")
+        SimpleRow(Icons.Outlined.Bookmarks, "المحفوظات", "الآيات والأحاديث والمواضع المفضلة", onClick = onOpenBookmarks)
         SimpleRow(Icons.Outlined.NotificationsNone, "إعدادات التنبيهات", "اختيار أنواع التذكيرات وأوقاتها")
         SimpleRow(Icons.Outlined.MenuBook, "حول تطبيق يقين", "الرؤية والمصادر وحقوق المحتوى")
         Spacer(Modifier.height(14.dp))
@@ -461,10 +469,12 @@ private fun InfoCard(title: String, body: String) {
 private fun SimpleRow(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     title: String,
-    subtitle: String
+    subtitle: String,
+    onClick: (() -> Unit)? = null
 ) {
     Row(
         modifier = Modifier.fillMaxWidth()
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(vertical = 5.dp)
             .background(Panel, RoundedCornerShape(16.dp))
             .padding(15.dp),
