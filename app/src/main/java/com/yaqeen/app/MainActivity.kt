@@ -577,6 +577,7 @@ private fun AdhkarScreen(modifier: Modifier = Modifier) {
             delay(60_000)
             val today = todayKey()
             if (today != dateKey) {
+                preferences.edit().clear().apply()
                 dateKey = today
                 counts = loadCounts(today)
             }
