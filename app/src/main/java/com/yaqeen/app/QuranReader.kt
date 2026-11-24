@@ -21,16 +21,21 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Bookmark
 import androidx.compose.material.icons.outlined.BookmarkBorder
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.CheckCircleOutline
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.PlayCircleOutline
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -163,6 +168,8 @@ fun QuranReaderScreen(
     var selectedSurah by remember { mutableStateOf<QuranSurah?>(null) }
     var selectedVerse by remember { mutableStateOf<Int?>(null) }
     var bookmarkedKeys by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var completedVerseKeys by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var showResetKhatmaDialog by remember { mutableStateOf(false) }
     var showBookmarks by remember { mutableStateOf(showBookmarksInitially) }
 
     LaunchedEffect(showBookmarksInitially) {
@@ -171,12 +178,25 @@ fun QuranReaderScreen(
 
     LaunchedEffect(Unit) {
         try {
-            bookmarkedKeys = context.getSharedPreferences(QURAN_PREFS, android.content.Context.MODE_PRIVATE)
-                .getStringSet("bookmarks", emptySet())?.toSet() ?: emptySet()
+            val prefs = context.getSharedPreferences(QURAN_PREFS, android.content.Context.MODE_PRIVATE)
+            bookmarkedKeys = runCatching {
+                prefs.getStringSet("bookmarks", emptySet())?.toSet() ?: emptySet()
+            }.getOrDefault(emptySet())
             surahs = withContext(Dispatchers.IO) { loadQuran(context.applicationContext) }
             loadError = !isCompleteQuran(surahs)
             if (!loadError) {
-                val prefs = context.getSharedPreferences(QURAN_PREFS, android.content.Context.MODE_PRIVATE)
+                completedVerseKeys = runCatching {
+                    prefs.getStringSet("completed_verses", emptySet()).orEmpty().filterTo(mutableSetOf()) { key ->
+                        val parts = key.split(":")
+                        if (parts.size != 2) false
+                        else {
+                            val surahNumber = parts[0].toIntOrNull()
+                            val verseNumber = parts[1].toIntOrNull()
+                            val surah = surahNumber?.let { surahs.getOrNull(it - 1) }
+                            surah != null && verseNumber != null && surah.verses.any { it.number == verseNumber }
+                        }
+                    }
+                }.getOrDefault(emptySet())
                 val savedSurahNumber = prefs.getInt("last_surah", 0)
                 val savedVerseNumber = prefs.getInt("last_verse", 1)
                 val savedSurah = surahs.firstOrNull { it.number == savedSurahNumber }
@@ -215,6 +235,16 @@ fun QuranReaderScreen(
             .putStringSet("bookmarks", updated)
             .apply()
     }
+    val toggleCompletedVerse: (QuranSurah, QuranVerse) -> Unit = { surah, verse ->
+        val key = "${surah.number}:${verse.number}"
+        val updated = completedVerseKeys.toMutableSet()
+        if (!updated.add(key)) updated.remove(key)
+        completedVerseKeys = updated
+        context.getSharedPreferences(QURAN_PREFS, android.content.Context.MODE_PRIVATE)
+            .edit()
+            .putStringSet("completed_verses", updated)
+            .apply()
+    }
     val savedVerseEntries = remember(bookmarkedKeys, surahs) {
         bookmarkedKeys.mapNotNull { key ->
             val parts = key.split(":")
@@ -227,6 +257,30 @@ fun QuranReaderScreen(
                 if (surah != null && verse != null) surah to verse else null
             }
         }.sortedWith(compareBy({ it.first.number }, { it.second.number }))
+    }
+
+    if (showResetKhatmaDialog) {
+        AlertDialog(
+            onDismissRequest = { showResetKhatmaDialog = false },
+            containerColor = QuranPanel,
+            titleContentColor = QuranGold,
+            textContentColor = QuranWhite,
+            title = { Text("إعادة ضبط الختمة") },
+            text = { Text("سيتم إلغاء علامات الآيات التي حددتها كمقروءة. هل تريد المتابعة؟") },
+            confirmButton = {
+                TextButton(onClick = {
+                    completedVerseKeys = emptySet()
+                    context.getSharedPreferences(QURAN_PREFS, android.content.Context.MODE_PRIVATE)
+                        .edit().remove("completed_verses").apply()
+                    showResetKhatmaDialog = false
+                }) { Text("إعادة الضبط", color = QuranGold) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showResetKhatmaDialog = false }) {
+                    Text("إلغاء", color = QuranMuted)
+                }
+            }
+        )
     }
 
     val current = selectedSurah
@@ -362,6 +416,14 @@ fun QuranReaderScreen(
                             ) {
                                 Text(verse.number.toString(), color = Color.White, fontSize = 11.sp)
                             }
+                            IconButton(onClick = { toggleCompletedVerse(current, verse) }) {
+                                val isCompleted = "${current.number}:${verse.number}" in completedVerseKeys
+                                Icon(
+                                    if (isCompleted) Icons.Outlined.CheckCircle else Icons.Outlined.CheckCircleOutline,
+                                    contentDescription = if (isCompleted) "إلغاء تحديد الآية كمقروءة" else "تحديد الآية كمقروءة",
+                                    tint = if (isCompleted) QuranEmerald else QuranMuted
+                                )
+                            }
                             IconButton(onClick = { toggleBookmark(current, verse) }) {
                                 Icon(
                                     if ("${current.number}:${verse.number}" in bookmarkedKeys) Icons.Outlined.Bookmark else Icons.Outlined.BookmarkBorder,
@@ -399,6 +461,34 @@ fun QuranReaderScreen(
             }
         }
         Text("مصحف كامل · ١١٤ سورة · ٦٢٣٦ آية", modifier = Modifier.padding(top = 5.dp, bottom = 8.dp), color = QuranMuted, fontSize = 12.sp)
+        Card(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
+            colors = CardDefaults.cardColors(containerColor = QuranPanel),
+            shape = RoundedCornerShape(15.dp)
+        ) {
+            Column(Modifier.padding(13.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("متابعة الختمة · اختيارية", color = QuranGold, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    Text("${completedVerseKeys.size} / 6236 آية", color = QuranMuted, fontSize = 11.sp)
+                }
+                Spacer(Modifier.height(8.dp))
+                LinearProgressIndicator(
+                    progress = (completedVerseKeys.size / 6236f).coerceIn(0f, 1f),
+                    modifier = Modifier.fillMaxWidth(),
+                    color = QuranEmerald,
+                    trackColor = QuranMuted.copy(alpha = 0.2f)
+                )
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = { showResetKhatmaDialog = true }) {
+                        Text("إعادة ضبط", color = QuranMuted, fontSize = 11.sp)
+                    }
+                }
+            }
+        }
         QuranAudioPlayerBar(mediaController, Modifier.padding(bottom = 10.dp))
         OutlinedTextField(
             value = search,
