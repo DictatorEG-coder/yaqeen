@@ -288,6 +288,11 @@ private fun QuranScreen(modifier: Modifier = Modifier) {
         ).forEach { name ->
             SimpleRow(Icons.Outlined.Headphones, name, "مرتل ومجود بحسب التسجيلات المتاحة")
         }
+        Spacer(Modifier.height(14.dp))
+        SimpleRow(Icons.Outlined.PlayCircleOutline, "مكتبة المحافل والتسجيلات", "تسجيلات موثقة ومصرح باستخدامها")
+        SimpleRow(Icons.Outlined.MenuBook, "الحفظ والتسميع", "تكرار المقاطع وتسجيل صوتك للمراجعة")
+        SimpleRow(Icons.Outlined.LibraryBooks, "التجويد والتفسير والبحث", "أحكام ملونة وتفسير موثق وبحث في الآيات")
+        SimpleRow(Icons.Outlined.Bookmarks, "العلامات والختمة", "حفظ مواضعك وختمة اختيارية")
         Spacer(Modifier.height(16.dp))
         InfoCard(
             title = "مكتبة التلاوات قيد التجهيز",
@@ -304,6 +309,8 @@ private fun SunnahScreen(modifier: Modifier = Modifier) {
         SimpleRow(Icons.Outlined.LibraryBooks, "صحيح البخاري", "الأبواب والأحاديث والبحث")
         SimpleRow(Icons.Outlined.LibraryBooks, "صحيح مسلم", "الأبواب والأحاديث والبحث")
         SimpleRow(Icons.Outlined.PlayCircleOutline, "حديث اليوم", "اختياري مع المصدر والتخريج")
+        SimpleRow(Icons.Outlined.Bookmarks, "السنن المهجورة", "سنن ثابتة مع الدليل والشرح المختصر")
+        SimpleRow(Icons.Outlined.Bookmarks, "سنة اليوم", "تذكير اختياري بسنة موثقة")
         SimpleRow(Icons.Outlined.Bookmarks, "شرح الحديث", "من شروح معتمدة مع ذكر المرجع")
         Spacer(Modifier.height(12.dp))
         InfoCard(
