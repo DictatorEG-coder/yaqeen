@@ -196,7 +196,7 @@ fun QuranReaderScreen(
                             surah != null && verseNumber != null && surah.verses.any { it.number == verseNumber }
                         }
                     }
-                }.getOrDefault(emptySet())
+                }.getOrDefault(mutableSetOf())
                 val savedSurahNumber = prefs.getInt("last_surah", 0)
                 val savedVerseNumber = prefs.getInt("last_verse", 1)
                 val savedSurah = surahs.firstOrNull { it.number == savedSurahNumber }
