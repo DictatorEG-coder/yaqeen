@@ -60,6 +60,16 @@ internal data class SunnahHadith(
         get() = texts.firstOrNull { it.language == "en" }?.body
 }
 
+internal data class SunnahHadithReference(
+    val collection: String,
+    val hadithNumber: String
+)
+
+internal data class SunnahHadithComparison(
+    val hadiths: List<SunnahHadith>,
+    val missingReferences: List<String>
+)
+
 internal data class SunnahPage<T>(
     val data: List<T>,
     val total: Int,
@@ -151,6 +161,17 @@ internal class SunnahApiClient(
         return parseHadithPage(
             getJson("/api/sunnah/collections/$slug/books/$encodedBook/hadiths?page=$page&limit=$limit")
         )
+    }
+
+    suspend fun fetchHadithReferences(references: List<SunnahHadithReference>): SunnahHadithComparison {
+        require(references.isNotEmpty() && references.size <= 20) { "Provide between 1 and 20 references" }
+        val refs = references.joinToString(",") { reference ->
+            val collection = validateCollection(reference.collection)
+            require(reference.hadithNumber.matches(Regex("^[0-9]+$"))) { "Invalid hadith number" }
+            "$collection:${reference.hadithNumber}"
+        }
+        val encodedRefs = URLEncoder.encode(refs, StandardCharsets.UTF_8.name())
+        return parseHadithComparison(getJson("/api/sunnah/hadiths/refs?refs=$encodedRefs"))
     }
 
     suspend fun fetchHadith(collection: String, hadithNumber: String): SunnahHadith {
@@ -259,6 +280,25 @@ internal class SunnahApiClient(
                 }
             }
             return parsePage(root, hadiths)
+        }
+
+        internal fun parseHadithComparison(json: String): SunnahHadithComparison {
+            val root = JSONObject(json)
+            val data = root.optJSONArray("data") ?: JSONArray()
+            val hadiths = buildList {
+                for (index in 0 until data.length()) {
+                    val item = data.optJSONObject(index) ?: continue
+                    runCatching { parseHadithObject(item) }.getOrNull()?.let(::add)
+                }
+            }
+            val missingJson = root.optJSONArray("missing") ?: JSONArray()
+            val missing = buildList {
+                for (index in 0 until missingJson.length()) {
+                    val reference = missingJson.optString(index)
+                    if (reference.isNotBlank() && reference != "null") add(reference)
+                }
+            }
+            return SunnahHadithComparison(hadiths, missing)
         }
 
         internal fun parseHadith(json: String): SunnahHadith =
