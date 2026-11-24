@@ -28,16 +28,8 @@ jobs:
       - name: Build debug APK
         run: gradle assembleDebug
 
-      - name: Run Quran integrity instrumentation tests
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 30
-          disable-animations: true
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          target: google_apis
-          arch: x86_64
-          profile: pixel_2
-          script: gradle connectedDebugAndroidTest
+      - name: Run Quran integrity unit tests
+        run: gradle testDebugUnitTest
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
