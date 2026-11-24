@@ -3,6 +3,10 @@ const ALLOWED_PREFIXES = [
   "/chapters",
   "/verses",
   "/recitations",
+  "/resources",
+  "/chapter_recitations",
+  "/audio",
+  "/quran",
   "/tafsirs",
   "/translations",
   "/search"
