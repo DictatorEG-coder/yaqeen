@@ -170,6 +170,7 @@ fun QuranReaderScreen(
     var bookmarkedKeys by remember { mutableStateOf<Set<String>>(emptySet()) }
     var completedVerseKeys by remember { mutableStateOf<Set<String>>(emptySet()) }
     var showResetKhatmaDialog by remember { mutableStateOf(false) }
+    var selectedAudioSource by remember { mutableStateOf(quranAudioSources.first()) }
     var showBookmarks by remember { mutableStateOf(showBookmarksInitially) }
 
     LaunchedEffect(showBookmarksInitially) {
@@ -363,7 +364,7 @@ fun QuranReaderScreen(
                 }
                 IconButton(
                     enabled = mediaController != null,
-                    onClick = { mediaController?.let { playMinshawiMurattal(it, current.number) } }
+                    onClick = { mediaController?.let { playQuranRecitation(it, current.number, selectedAudioSource) } }
                 ) {
                     Icon(Icons.Outlined.PlayCircleOutline, contentDescription = "استماع للسورة", tint = QuranGold)
                 }
@@ -371,7 +372,7 @@ fun QuranReaderScreen(
                     Icon(Icons.Outlined.BookmarkBorder, contentDescription = "المحفوظات", tint = QuranGold)
                 }
             }
-            QuranAudioPlayerBar(mediaController, Modifier.padding(bottom = 10.dp))
+            QuranAudioPlayerBar(mediaController, selectedAudioSource, { selectedAudioSource = it }, Modifier.padding(bottom = 10.dp))
             LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
                 if (current.number != 1 && current.number != 9) {
                     openingBasmala(current.verses.firstOrNull() ?: QuranVerse(0, ""))?.let { basmala ->
@@ -571,7 +572,7 @@ fun QuranReaderScreen(
                                     Text("${surah.verses.size} آية", color = QuranMuted, fontSize = 11.sp)
                                     IconButton(
                                         enabled = mediaController != null,
-                                        onClick = { mediaController?.let { playMinshawiMurattal(it, surah.number) } }
+                                        onClick = { mediaController?.let { playQuranRecitation(it, surah.number, selectedAudioSource) } }
                                     ) {
                                         Icon(Icons.Outlined.PlayCircleOutline, contentDescription = "استماع لسورة ${surah.name}", tint = QuranGold)
                                     }
