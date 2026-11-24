@@ -89,6 +89,11 @@ internal class QuranFoundationClient(
     }
 
     companion object {
+        private fun JSONObject.readNonBlankString(key: String): String? {
+            if (isNull(key)) return null
+            return optString(key).trim().takeIf { it.isNotEmpty() && it != "null" }
+        }
+
         internal fun parseChapterReciters(json: String): List<QFChapterReciter> {
             val root = JSONObject(json)
             val array = root.optJSONArray("reciters")
@@ -97,16 +102,16 @@ internal class QuranFoundationClient(
                 for (index in 0 until array.length()) {
                     val item = array.optJSONObject(index) ?: continue
                     val id = item.optInt("id", 0)
-                    val name = item.optString("name", "").trim()
-                    if (id <= 0 || name.isEmpty()) continue
+                    val name = item.readNonBlankString("name")
+                    if (id <= 0 || name == null) continue
                     add(
                         QFChapterReciter(
                             id = id,
                             name = name,
-                            style = item.optJSONObject("style")?.optString("name")?.takeIf { it.isNotBlank() },
-                            qirat = item.optJSONObject("qirat")?.optString("name")?.takeIf { it.isNotBlank() },
+                            style = item.optJSONObject("style")?.readNonBlankString("name"),
+                            qirat = item.optJSONObject("qirat")?.readNonBlankString("name"),
                             translatedName = item.optJSONObject("translated_name")
-                                ?.optString("name")?.takeIf { it.isNotBlank() }
+                                ?.readNonBlankString("name")
                         )
                     )
                 }
