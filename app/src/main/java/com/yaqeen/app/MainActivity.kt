@@ -3,6 +3,7 @@ package com.yaqeen.app
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.app.TimePickerDialog
 import android.net.Uri
 import android.os.Bundle
 import android.os.Build
@@ -90,13 +91,23 @@ private const val TELEGRAM_CHANNEL = "https://t.me/Dictator_channel2"
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent { YaqeenApp() }
+        setContent {
+            YaqeenApp(
+                initialSurahNumber = intent.getIntExtra(EXTRA_OPEN_SURAH, 0),
+                openFridayReminders = intent.getBooleanExtra(EXTRA_OPEN_FRIDAY_REMINDERS, false)
+            )
+        }
+    }
+
+    companion object {
+        const val EXTRA_OPEN_SURAH = "com.yaqeen.app.OPEN_SURAH"
+        const val EXTRA_OPEN_FRIDAY_REMINDERS = "com.yaqeen.app.OPEN_FRIDAY_REMINDERS"
     }
 }
 
 @Composable
-private fun YaqeenApp() {
-    var selectedTab by remember { mutableIntStateOf(0) }
+private fun YaqeenApp(initialSurahNumber: Int = 0, openFridayReminders: Boolean = false) {
+    var selectedTab by remember { mutableIntStateOf(if (initialSurahNumber in 1..114) 1 else if (openFridayReminders) 4 else 0) }
     var openBookmarksRequested by remember { mutableStateOf(false) }
     MaterialTheme {
         androidx.compose.runtime.CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
@@ -141,6 +152,7 @@ private fun YaqeenApp() {
                     1 -> QuranReaderScreen(
                         modifier = Modifier.padding(padding),
                         showBookmarksInitially = openBookmarksRequested,
+                        initialSurahNumber = initialSurahNumber,
                         onBookmarksOpened = { openBookmarksRequested = false }
                     )
                     2 -> SunnahScreen(Modifier.padding(padding))
@@ -711,6 +723,25 @@ private fun MoreScreen(modifier: Modifier = Modifier, onOpenBookmarks: () -> Uni
     PageColumn(modifier) {
         PageHeader("المزيد", "إعدادات يقين ومعلومات التطبيق")
         SimpleRow(Icons.Outlined.Bookmarks, "المحفوظات", "الآيات المحفوظة من المصحف", onClick = onOpenBookmarks)
+        SectionHeading("تذكيرات يوم الجمعة")
+        Spacer(Modifier.height(10.dp))
+        FridayReminderCard(
+            kind = FridayReminderKind.KAHF,
+            title = "قراءة سورة الكهف",
+            description = "تذكير أسبوعي يوم الجمعة، ويفتح سورة الكهف مباشرة في المصحف.",
+            defaultHour = 9
+        )
+        FridaySalawatReminderCard()
+        FridayReminderCard(
+            kind = FridayReminderKind.HADITH,
+            title = "حديث يوم الجمعة",
+            description = "تذكير أسبوعي بحديث صحيح متعلق بفضل الجمعة وآدابها.",
+            defaultHour = 10
+        )
+        FridayHadithCard()
+        Spacer(Modifier.height(8.dp))
+        SectionHeading("تذكير عام")
+        Spacer(Modifier.height(8.dp))
         SalawatReminderCard()
         SimpleRow(Icons.Outlined.MenuBook, "حول تطبيق يقين", "الرؤية والمصادر وحقوق المحتوى")
         Spacer(Modifier.height(14.dp))
@@ -777,6 +808,157 @@ private fun MoreScreen(modifier: Modifier = Modifier, onOpenBookmarks: () -> Uni
             fontSize = 10.sp,
             textAlign = TextAlign.Center
         )
+    }
+}
+
+@Composable
+private fun FridayReminderCard(
+    kind: FridayReminderKind,
+    title: String,
+    description: String,
+    defaultHour: Int
+) {
+    val context = LocalContext.current
+    var enabled by remember { mutableStateOf(FridayReminderScheduler.isEnabled(context, kind)) }
+    var hour by remember { mutableIntStateOf(FridayReminderScheduler.hour(context, kind)) }
+    var minute by remember { mutableIntStateOf(FridayReminderScheduler.minute(context, kind)) }
+    var permissionDenied by remember { mutableStateOf(false) }
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        permissionDenied = !granted
+        if (granted) {
+            FridayReminderScheduler.enable(context, kind, hour, minute)
+            enabled = true
+        }
+    }
+    fun activate() {
+        if (Build.VERSION.SDK_INT >= 33 &&
+            context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            permissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            FridayReminderScheduler.enable(context, kind, hour, minute)
+            enabled = true
+            permissionDenied = false
+        }
+    }
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = Panel)
+    ) {
+        Column(Modifier.padding(16.dp)) {
+            Text(title, color = Gold, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(5.dp))
+            Text(description, color = Muted, fontSize = 12.sp, lineHeight = 19.sp)
+            Spacer(Modifier.height(10.dp))
+            OutlinedButton(
+                onClick = {
+                    TimePickerDialog(context, { _, h, m -> hour = h; minute = m }, hour, minute, false).show()
+                },
+                shape = RoundedCornerShape(10.dp)
+            ) {
+                Text("وقت التذكير: %02d:%02d".format(hour, minute), color = MainText)
+            }
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Button(
+                    onClick = { if (enabled) { FridayReminderScheduler.disable(context, kind); enabled = false } else activate() },
+                    colors = ButtonDefaults.buttonColors(containerColor = if (enabled) PanelSoft else Emerald),
+                    shape = RoundedCornerShape(10.dp)
+                ) { Text(if (enabled) "إيقاف" else "تفعيل", color = MainText) }
+                Text(if (enabled) "مفعّل كل يوم جمعة" else "غير مفعّل", color = if (enabled) Gold else Muted, fontSize = 11.sp)
+            }
+            if (permissionDenied) {
+                Spacer(Modifier.height(5.dp))
+                Text("يلزم السماح بإشعارات يقين من إعدادات الهاتف.", color = Gold, fontSize = 11.sp)
+            }
+        }
+    }
+}
+
+@Composable
+private fun FridaySalawatReminderCard() {
+    val context = LocalContext.current
+    val kind = FridayReminderKind.SALAWAT
+    var enabled by remember { mutableStateOf(FridayReminderScheduler.isEnabled(context, kind)) }
+    var hour by remember { mutableIntStateOf(FridayReminderScheduler.hour(context, kind)) }
+    var minute by remember { mutableIntStateOf(FridayReminderScheduler.minute(context, kind)) }
+    var interval by remember { mutableIntStateOf(FridayReminderScheduler.intervalHours(context)) }
+    var permissionDenied by remember { mutableStateOf(false) }
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        permissionDenied = !granted
+        if (granted) {
+            FridayReminderScheduler.enable(context, kind, hour, minute, interval)
+            enabled = true
+        }
+    }
+    fun activate() {
+        if (Build.VERSION.SDK_INT >= 33 &&
+            context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) permissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+        else {
+            FridayReminderScheduler.enable(context, kind, hour, minute, interval)
+            enabled = true
+            permissionDenied = false
+        }
+    }
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = Panel)
+    ) {
+        Column(Modifier.padding(16.dp)) {
+            Text("الإكثار من الصلاة على النبي ﷺ", color = Gold, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(5.dp))
+            Text("تذكير متكرر يوم الجمعة فقط، ويتوقف التكرار بعد نهاية اليوم حتى الجمعة التالية.", color = Muted, fontSize = 12.sp, lineHeight = 19.sp)
+            Spacer(Modifier.height(9.dp))
+            OutlinedButton(
+                onClick = { TimePickerDialog(context, { _, h, m -> hour = h; minute = m }, hour, minute, false).show() },
+                shape = RoundedCornerShape(10.dp)
+            ) { Text("بداية التذكير: %02d:%02d".format(hour, minute), color = MainText) }
+            Spacer(Modifier.height(8.dp))
+            Text("التكرار كل:", color = MainText, fontSize = 12.sp)
+            Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                listOf(1, 2, 3, 4, 6, 8, 12).forEach { hours ->
+                    OutlinedButton(
+                        onClick = {
+                            interval = hours
+                            if (enabled) FridayReminderScheduler.enable(context, kind, hour, minute, interval)
+                        },
+                        shape = RoundedCornerShape(9.dp),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 9.dp, vertical = 4.dp)
+                    ) { Text("$hours س", color = if (interval == hours) Gold else Muted, fontSize = 10.sp) }
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            Button(
+                onClick = { if (enabled) { FridayReminderScheduler.disable(context, kind); enabled = false } else activate() },
+                colors = ButtonDefaults.buttonColors(containerColor = if (enabled) PanelSoft else Emerald),
+                shape = RoundedCornerShape(10.dp)
+            ) { Text(if (enabled) "إيقاف" else "تفعيل", color = MainText) }
+            if (permissionDenied) Text("يلزم السماح بإشعارات يقين من إعدادات الهاتف.", color = Gold, fontSize = 11.sp)
+        }
+    }
+}
+
+@Composable
+private fun FridayHadithCard() {
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(bottom = 14.dp),
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = PanelSoft)
+    ) {
+        Column(Modifier.padding(17.dp)) {
+            Text("حديث الجمعة", color = Gold, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(9.dp))
+            Text(
+                "«إِنَّ مِنْ أَفْضَلِ أَيَّامِكُمْ يَوْمَ الْجُمُعَةِ، فِيهِ خُلِقَ آدَمُ وَفِيهِ قُبِضَ، وَفِيهِ النَّفْخَةُ وَفِيهِ الصَّعْقَةُ، فَأَكْثِرُوا عَلَيَّ مِنَ الصَّلَاةِ فِيهِ، فَإِنَّ صَلَاتَكُمْ مَعْرُوضَةٌ عَلَيَّ»",
+                color = MainText, fontSize = 15.sp, lineHeight = 29.sp
+            )
+            Spacer(Modifier.height(9.dp))
+            Text("الراوي: أوس بن أوس · سنن أبي داود (1047) · صححه الألباني", color = Gold, fontSize = 11.sp)
+            Text("يُعرض هذا الحديث داخل التطبيق دون الحاجة إلى اتصال بالإنترنت.", color = Muted, fontSize = 10.sp)
+        }
     }
 }
 
