@@ -88,7 +88,7 @@ private val surahNames = listOf(
     "النصر", "المسد", "الإخلاص", "الفلق", "الناس"
 )
 
-private fun loadQuran(context: android.content.Context): List<QuranSurah> {
+internal fun loadQuran(context: android.content.Context): List<QuranSurah> {
     val verses = context.assets.open("quran-uthmani.txt").bufferedReader(Charsets.UTF_8).useLines { lines ->
         lines.mapNotNull { line ->
             val parts = line.split('|', limit = 3)
@@ -106,7 +106,7 @@ private fun loadQuran(context: android.content.Context): List<QuranSurah> {
     }
 }
 
-private fun isCompleteQuran(surahs: List<QuranSurah>): Boolean {
+internal fun isCompleteQuran(surahs: List<QuranSurah>): Boolean {
     if (surahs.size != 114 || expectedVerseCounts.size != 114) return false
     if (surahs.sumOf { it.verses.size } != 6236) return false
     return surahs.withIndex().all { (index, surah) ->
