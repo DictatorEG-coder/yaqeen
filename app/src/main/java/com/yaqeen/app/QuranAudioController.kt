@@ -149,31 +149,74 @@ fun rememberQuranMediaController(): MediaController? {
     return controller
 }
 
-internal fun minshawiMurattalUrl(surahNumber: Int): String {
-    require(surahNumber in 1..114) { "Surah number must be between 1 and 114" }
-    return String.format(
-        Locale.US,
-        "https://download.quranicaudio.com/quran/muhammad_siddeeq_al-minshaawee/%03d.mp3",
-        surahNumber
+internal data class QuranAudioSource(
+    val id: String,
+    val reciterName: String,
+    val style: String,
+    val baseUrl: String
+)
+
+internal val quranAudioSources = listOf(
+    QuranAudioSource(
+        "minshawi_murattal", "محمد صديق المنشاوي", "مرتل",
+        "https://download.quranicaudio.com/quran/muhammad_siddeeq_al-minshaawee/"
+    ),
+    QuranAudioSource(
+        "abdulbaset_murattal", "عبد الباسط عبد الصمد", "مرتل",
+        "https://download.quranicaudio.com/quran/abdul_basit_murattal/"
+    ),
+    QuranAudioSource(
+        "abdulbaset_mujawwad", "عبد الباسط عبد الصمد", "مجود",
+        "https://download.quranicaudio.com/quran/abdulbaset_mujawwad/"
+    ),
+    QuranAudioSource(
+        "husary_radio", "محمود خليل الحصري", "إذاعي",
+        "https://download.quranicaudio.com/quran/mahmood_khaleel_al-husaree_iza3a/"
+    ),
+    QuranAudioSource(
+        "mustafa_ismail", "مصطفى إسماعيل", "تلاوة كاملة",
+        "https://download.quranicaudio.com/quran/mostafa_ismaeel/"
+    ),
+    QuranAudioSource(
+        "sudais", "عبدالرحمن السديس", "تلاوة كاملة",
+        "https://download.quranicaudio.com/quran/abdurrahmaan_as-sudays/"
+    ),
+    QuranAudioSource(
+        "shuraim", "سعود الشريم", "تلاوة كاملة",
+        "https://download.quranicaudio.com/quran/sa3ood_al-shuraym/"
+    ),
+    QuranAudioSource(
+        "afasy", "مشاري راشد العفاسي", "تلاوة كاملة",
+        "https://download.quranicaudio.com/quran/mishaari_raashid_al_3afaasee/"
     )
+)
+
+internal fun quranAudioUrl(sourceId: String, surahNumber: Int): String {
+    require(surahNumber in 1..114) { "Surah number must be between 1 and 114" }
+    val source = quranAudioSources.firstOrNull { it.id == sourceId }
+        ?: throw IllegalArgumentException("Unknown Quran audio source: $sourceId")
+    return source.baseUrl + String.format(Locale.US, "%03d.mp3", surahNumber)
 }
 
-fun playMinshawiMurattal(controller: MediaController, startSurah: Int) {
+internal fun minshawiMurattalUrl(surahNumber: Int): String =
+    quranAudioUrl("minshawi_murattal", surahNumber)
+
+fun playQuranRecitation(controller: MediaController, startSurah: Int, source: QuranAudioSource) {
+    require(startSurah in 1..114) { "Surah number must be between 1 and 114" }
     val playlist = surahNames.mapIndexed { index, name ->
         val number = index + 1
-        val audioUrl = minshawiMurattalUrl(number)
         MediaItem.Builder()
-            .setMediaId("minshawi-murattal-$number")
-            .setUri(audioUrl)
+            .setMediaId("${source.id}-$number")
+            .setUri(quranAudioUrl(source.id, number))
             .setMediaMetadata(
                 MediaMetadata.Builder()
                     .setTitle(name)
-                    .setArtist("محمد صديق المنشاوي · مرتل · Quran Foundation / QuranicAudio")
+                    .setArtist("${source.reciterName} · ${source.style} · Quran Foundation / QuranicAudio")
                     .build()
             )
             .build()
     }
-    controller.setMediaItems(playlist, (startSurah - 1).coerceIn(0, playlist.lastIndex), 0L)
+    controller.setMediaItems(playlist, startSurah - 1, 0L)
     controller.prepare()
     controller.play()
 }
