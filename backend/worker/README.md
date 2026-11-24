@@ -6,9 +6,8 @@
 
 - أنشئ تطبيقًا من نوع **Backend/server** في Quran Foundation Developer Console.
 - اطلب صلاحيات Content التي تحتاجها فقط. الإعداد الافتراضي هنا يطلب:
-  - `content.quran.read`
-  - `content.audio.read`
-  - `content.tafsirs.read`
+  - `content.audio.read` (required for the current reciter and timing endpoints)
+- Add `content.quran.read` or `content.tafsirs.read` only when those API features are enabled and those scopes are approved.
 - لا تضع بيانات الاعتماد في GitHub أو في كود Android أو في المحادثة.
 - بيئة pre-live لا تحتوي إلا على الفاتحة والبقرة. لا تربطها بنسخة الإنتاج؛ يلزم اعتماد الوصول إلى production من Quran Foundation أولًا.
 - هذا الخادم لا يخزن بيانات المستخدم، ولا ينفذ طلبات كتابة.
