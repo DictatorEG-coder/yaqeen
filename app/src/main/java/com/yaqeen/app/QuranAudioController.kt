@@ -201,7 +201,7 @@ internal fun quranAudioUrl(sourceId: String, surahNumber: Int): String {
 internal fun minshawiMurattalUrl(surahNumber: Int): String =
     quranAudioUrl("minshawi_murattal", surahNumber)
 
-fun playQuranRecitation(controller: MediaController, startSurah: Int, source: QuranAudioSource) {
+internal fun playQuranRecitation(controller: MediaController, startSurah: Int, source: QuranAudioSource) {
     require(startSurah in 1..114) { "Surah number must be between 1 and 114" }
     val playlist = surahNames.mapIndexed { index, name ->
         val number = index + 1
@@ -222,7 +222,7 @@ fun playQuranRecitation(controller: MediaController, startSurah: Int, source: Qu
 }
 
 @Composable
-fun QuranAudioPlayerBar(
+internal fun QuranAudioPlayerBar(
     controller: MediaController?,
     selectedSource: QuranAudioSource,
     onSourceSelected: (QuranAudioSource) -> Unit,
