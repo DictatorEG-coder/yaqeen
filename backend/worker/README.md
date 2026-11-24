@@ -32,6 +32,9 @@
 - `/api/quran/chapters`
 - `/api/quran/verses/...`
 - `/api/quran/recitations/...`
+- `/api/quran/resources/chapter_reciters`
+- `/api/quran/chapter_recitations/{reciter_id}/{chapter_number}?segments=true`
+- `/api/quran/audio/...`
 - `/api/quran/tafsirs/...`
 - `/api/quran/translations/...`
 - `/api/quran/search/...`
