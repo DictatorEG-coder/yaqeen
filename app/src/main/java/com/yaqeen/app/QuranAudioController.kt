@@ -126,7 +126,7 @@ fun playMinshawiMurattal(controller: MediaController, startSurah: Int) {
 
 @Composable
 fun QuranAudioPlayerBar(controller: MediaController?, modifier: Modifier = Modifier) {
-    if (controller == null || controller.mediaItemCount == 0) return
+    if (controller == null) return
 
     var isPlaying by remember(controller) { mutableStateOf(controller.isPlaying) }
     var title by remember(controller) {
@@ -177,7 +177,7 @@ fun QuranAudioPlayerBar(controller: MediaController?, modifier: Modifier = Modif
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        title.ifBlank { "تلاوة القرآن الكريم" },
+                        title.ifBlank { "اختر سورة لبدء التلاوة" },
                         color = AudioWhite,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold,
@@ -203,7 +203,7 @@ fun QuranAudioPlayerBar(controller: MediaController?, modifier: Modifier = Modif
                 }
             }
             LinearProgressIndicator(
-                progress = { progress },
+                progress = progress,
                 modifier = Modifier.fillMaxWidth(),
                 color = AudioGold,
                 trackColor = AudioMuted.copy(alpha = 0.25f)
