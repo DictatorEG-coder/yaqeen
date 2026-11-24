@@ -27,6 +27,8 @@ import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.PlayCircleOutline
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -172,6 +174,10 @@ fun QuranReaderScreen(
     var showResetKhatmaDialog by remember { mutableStateOf(false) }
     var selectedAudioSource by remember { mutableStateOf(quranAudioSources.first()) }
     var showBookmarks by remember { mutableStateOf(showBookmarksInitially) }
+    var selectedTafsirKey by remember { mutableStateOf<String?>(null) }
+    var tafsirText by remember { mutableStateOf<QFTafsirEntry?>(null) }
+    var tafsirLoading by remember { mutableStateOf(false) }
+    var tafsirError by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(showBookmarksInitially) {
         if (showBookmarksInitially) showBookmarks = true
@@ -210,6 +216,27 @@ fun QuranReaderScreen(
             loadError = true
         } finally {
             loading = false
+        }
+    }
+
+    LaunchedEffect(selectedTafsirKey) {
+        val key = selectedTafsirKey ?: return@LaunchedEffect
+        tafsirText = null
+        tafsirError = null
+        tafsirLoading = true
+        try {
+            val client = QuranFoundationClient()
+            check(client.isConfigured) {
+                "مصدر التفسير غير مربوط بعد. يلزم إعداد خادم Quran Foundation ومنحه صلاحية tafsirs."
+            }
+            val resources = client.fetchArabicTafsirResources()
+            val resource = resources.firstOrNull()
+                ?: throw IllegalStateException("لا تتوفر حاليًا موارد تفسير عربية من المصدر.")
+            tafsirText = client.fetchTafsirForVerse(resource.id, key)
+        } catch (error: Exception) {
+            tafsirError = error.message ?: "تعذّر تحميل التفسير من المصدر."
+        } finally {
+            tafsirLoading = false
         }
     }
 
@@ -258,6 +285,48 @@ fun QuranReaderScreen(
                 if (surah != null && verse != null) surah to verse else null
             }
         }.sortedWith(compareBy({ it.first.number }, { it.second.number }))
+    }
+
+    if (selectedTafsirKey != null) {
+        AlertDialog(
+            onDismissRequest = { selectedTafsirKey = null },
+            containerColor = QuranPanel,
+            titleContentColor = QuranGold,
+            textContentColor = QuranWhite,
+            title = { Text("تفسير الآية ${selectedTafsirKey}") },
+            text = {
+                Column {
+                    when {
+                        tafsirLoading -> Text("جارٍ تحميل التفسير من المصدر…", color = QuranMuted)
+                        tafsirError != null -> Text(tafsirError ?: "", color = QuranMuted, lineHeight = 24.sp)
+                        tafsirText != null -> {
+                            Text(
+                                listOfNotNull(tafsirText?.resourceName, tafsirText?.authorName).joinToString(" · "),
+                                color = QuranGold,
+                                fontSize = 11.sp
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                androidx.core.text.HtmlCompat.fromHtml(
+                                    tafsirText?.text.orEmpty(),
+                                    androidx.core.text.HtmlCompat.FROM_HTML_MODE_LEGACY
+                                ).toString().trim(),
+                                color = QuranWhite,
+                                fontSize = 14.sp,
+                                lineHeight = 25.sp
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            Text("المصدر: Quran Foundation · التفسير المنقول كما ورد من المصدر", color = QuranMuted, fontSize = 10.sp)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { selectedTafsirKey = null }) {
+                    Text("إغلاق", color = QuranGold)
+                }
+            }
+        )
     }
 
     if (showResetKhatmaDialog) {
@@ -406,6 +475,14 @@ fun QuranReaderScreen(
                             textAlign = TextAlign.Start
                         )
                         Spacer(Modifier.height(9.dp))
+                        Button(
+                            onClick = { selectedTafsirKey = "${current.number}:${verse.number}" },
+                            colors = ButtonDefaults.buttonColors(containerColor = QuranEmerald.copy(alpha = 0.32f)),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text("تفسير الآية", color = QuranGold, fontSize = 11.sp)
+                        }
+                        Spacer(Modifier.height(5.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
