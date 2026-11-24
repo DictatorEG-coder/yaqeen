@@ -100,14 +100,19 @@ fun rememberQuranMediaController(): MediaController? {
     return controller
 }
 
+internal fun minshawiMurattalUrl(surahNumber: Int): String {
+    require(surahNumber in 1..114) { "Surah number must be between 1 and 114" }
+    return String.format(
+        Locale.US,
+        "https://download.quranicaudio.com/quran/muhammad_siddeeq_al-minshaawee/%03d.mp3",
+        surahNumber
+    )
+}
+
 fun playMinshawiMurattal(controller: MediaController, startSurah: Int) {
     val playlist = surahNames.mapIndexed { index, name ->
         val number = index + 1
-        val audioUrl = String.format(
-            Locale.US,
-            "https://download.quranicaudio.com/quran/muhammad_siddeeq_al-minshaawee/%03d.mp3",
-            number
-        )
+        val audioUrl = minshawiMurattalUrl(number)
         MediaItem.Builder()
             .setMediaId("minshawi-murattal-$number")
             .setUri(audioUrl)
