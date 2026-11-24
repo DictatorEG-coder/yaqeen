@@ -198,6 +198,9 @@ internal fun quranAudioUrl(sourceId: String, surahNumber: Int): String {
     return source.baseUrl + String.format(Locale.US, "%03d.mp3", surahNumber)
 }
 
+internal fun surahNumberFromMediaId(mediaId: String?): Int? =
+    mediaId?.substringAfterLast('-')?.toIntOrNull()?.takeIf { it in 1..114 }
+
 internal fun minshawiMurattalUrl(surahNumber: Int): String =
     quranAudioUrl("minshawi_murattal", surahNumber)
 
@@ -346,7 +349,7 @@ internal fun QuranAudioPlayerBar(
                                 onClick = {
                                     onSourceSelected(source)
                                     if (controller.mediaItemCount > 0) {
-                                        val currentSurah = (controller.currentMediaItemIndex + 1).coerceIn(1, 114)
+                                        val currentSurah = surahNumberFromMediaId(controller.currentMediaItem?.mediaId) ?: 1
                                         playQuranRecitation(controller, currentSurah, source)
                                     }
                                     sourceMenuExpanded = false
