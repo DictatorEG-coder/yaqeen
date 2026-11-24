@@ -188,6 +188,11 @@ fun QuranAudioPlayerBar(controller: MediaController?, modifier: Modifier = Modif
     }
     var position by remember(controller) { mutableStateOf(0L) }
     var duration by remember(controller) { mutableStateOf(0L) }
+    var speed by remember(controller) { mutableStateOf(controller.playbackParameters.speed) }
+    var repeatMode by remember(controller) { mutableStateOf(controller.repeatMode) }
+    var speedMenuExpanded by remember { mutableStateOf(false) }
+    var timerMenuExpanded by remember { mutableStateOf(false) }
+    var sleepTimerLabel by remember { mutableStateOf("مؤقت النوم") }
 
     DisposableEffect(controller) {
         val listener = object : Player.Listener {
@@ -203,6 +208,14 @@ fun QuranAudioPlayerBar(controller: MediaController?, modifier: Modifier = Modif
 
             override fun onPlaybackStateChanged(playbackState: Int) {
                 duration = controller.duration.coerceAtLeast(0L)
+            }
+
+            override fun onPlaybackParametersChanged(playbackParameters: PlaybackParameters) {
+                speed = playbackParameters.speed
+            }
+
+            override fun onRepeatModeChanged(mode: Int) {
+                repeatMode = mode
             }
         }
         controller.addListener(listener)
@@ -262,6 +275,79 @@ fun QuranAudioPlayerBar(controller: MediaController?, modifier: Modifier = Modif
                 color = AudioGold,
                 trackColor = AudioMuted.copy(alpha = 0.25f)
             )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                androidx.compose.foundation.layout.Box {
+                    TextButton(onClick = { speedMenuExpanded = true }) {
+                        Text("${speed}×", color = AudioGold, fontSize = 11.sp)
+                    }
+                    DropdownMenu(
+                        expanded = speedMenuExpanded,
+                        onDismissRequest = { speedMenuExpanded = false }
+                    ) {
+                        listOf(0.75f, 1f, 1.25f, 1.5f, 2f).forEach { selectedSpeed ->
+                            DropdownMenuItem(
+                                text = { Text("${selectedSpeed}×") },
+                                onClick = {
+                                    controller.setPlaybackParameters(PlaybackParameters(selectedSpeed, 1f))
+                                    speed = selectedSpeed
+                                    speedMenuExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+                TextButton(
+                    onClick = {
+                        controller.repeatMode = if (controller.repeatMode == Player.REPEAT_MODE_ONE) {
+                            Player.REPEAT_MODE_OFF
+                        } else {
+                            Player.REPEAT_MODE_ONE
+                        }
+                    }
+                ) {
+                    Icon(Icons.Outlined.RepeatOne, contentDescription = null, tint = AudioGold)
+                    Text(
+                        if (repeatMode == Player.REPEAT_MODE_ONE) "تكرار السورة" else "التكرار متوقف",
+                        color = AudioMuted,
+                        fontSize = 10.sp
+                    )
+                }
+                androidx.compose.foundation.layout.Box {
+                    TextButton(onClick = { timerMenuExpanded = true }) {
+                        Text(sleepTimerLabel, color = AudioGold, fontSize = 10.sp)
+                    }
+                    DropdownMenu(
+                        expanded = timerMenuExpanded,
+                        onDismissRequest = { timerMenuExpanded = false }
+                    ) {
+                        listOf(15, 30, 45, 60, 90).forEach { minutes ->
+                            DropdownMenuItem(
+                                text = { Text("${minutes} دقيقة") },
+                                onClick = {
+                                    sleepTimerLabel = if (QuranPlaybackService.scheduleSleepTimer(minutes)) {
+                                        "المؤقت: ${minutes} د"
+                                    } else {
+                                        "ابدأ التلاوة أولًا"
+                                    }
+                                    timerMenuExpanded = false
+                                }
+                            )
+                        }
+                        DropdownMenuItem(
+                            text = { Text("إلغاء المؤقت") },
+                            onClick = {
+                                QuranPlaybackService.cancelSleepTimer()
+                                sleepTimerLabel = "مؤقت النوم"
+                                timerMenuExpanded = false
+                            }
+                        )
+                    }
+                }
+            }
         }
     }
 }
