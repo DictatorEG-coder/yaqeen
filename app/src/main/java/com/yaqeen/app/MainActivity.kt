@@ -48,10 +48,12 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -63,6 +65,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 private val Ink = Color(0xFF090E0B)
 private val Panel = Color(0xFF141D18)
@@ -313,19 +317,213 @@ private fun QuranScreen(modifier: Modifier = Modifier) {
 
 @Composable
 private fun SunnahScreen(modifier: Modifier = Modifier) {
+    val client = remember { SunnahApiClient() }
+    val scope = rememberCoroutineScope()
+    var bukhari by remember { mutableStateOf<SunnahCollection?>(null) }
+    var muslim by remember { mutableStateOf<SunnahCollection?>(null) }
+    var bukhariBooks by remember { mutableStateOf<List<SunnahBook>>(emptyList()) }
+    var muslimBooks by remember { mutableStateOf<List<SunnahBook>>(emptyList()) }
+    var selectedCollection by remember { mutableStateOf<String?>(null) }
+    var selectedBook by remember { mutableStateOf<SunnahBook?>(null) }
+    var hadiths by remember { mutableStateOf<List<SunnahHadith>>(emptyList()) }
+    var nextHadithPage by remember { mutableStateOf<Int?>(null) }
+    var loading by remember { mutableStateOf(false) }
+    var initialized by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(client.isConfigured) {
+        if (!client.isConfigured) return@LaunchedEffect
+        loading = true
+        try {
+            bukhari = client.fetchCollection("bukhari")
+            delay(650)
+            muslim = client.fetchCollection("muslim")
+            delay(650)
+            bukhariBooks = client.fetchBooks("bukhari").data
+            delay(650)
+            muslimBooks = client.fetchBooks("muslim").data
+            error = null
+        } catch (_: Exception) {
+            error = "تعذّر الوصول إلى مصدر الحديث الرسمي. تحقق من إعداد الخادم ومفتاح الوصول."
+        } finally {
+            loading = false
+            initialized = true
+        }
+    }
+
+    fun loadHadithPage(collection: String, book: SunnahBook, page: Int, append: Boolean) {
+        scope.launch {
+            loading = true
+            error = null
+            try {
+                val result = client.fetchBookHadiths(collection, book.bookNumber, page, 20)
+                hadiths = if (append) hadiths + result.data else result.data
+                nextHadithPage = result.nextPage
+            } catch (_: Exception) {
+                error = "تعذّر تحميل الأحاديث من المصدر. لم نعرض نصًا بديلًا أو غير موثق."
+            } finally {
+                loading = false
+            }
+        }
+    }
+
     PageColumn(modifier) {
-        PageHeader("السنة النبوية", "مصادر الحديث والشرح والتخريج")
-        SimpleRow(Icons.Outlined.LibraryBooks, "صحيح البخاري", "الأبواب والأحاديث والبحث")
-        SimpleRow(Icons.Outlined.LibraryBooks, "صحيح مسلم", "الأبواب والأحاديث والبحث")
-        SimpleRow(Icons.Outlined.PlayCircleOutline, "حديث اليوم", "اختياري مع المصدر والتخريج")
-        SimpleRow(Icons.Outlined.Bookmarks, "السنن المهجورة", "سنن ثابتة مع الدليل والشرح المختصر")
-        SimpleRow(Icons.Outlined.Bookmarks, "سنة اليوم", "تذكير اختياري بسنة موثقة")
-        SimpleRow(Icons.Outlined.Bookmarks, "شرح الحديث", "من شروح معتمدة مع ذكر المرجع")
-        Spacer(Modifier.height(12.dp))
-        InfoCard(
-            title = "المحتوى قيد الإعداد",
-            body = "لن نضع أحاديث أو درجات أو شروحًا غير متحقق منها. سيُربط كل نص بمصدره وبيانات تخريجه."
-        )
+        PageHeader("السنة النبوية", "صحيح البخاري وصحيح مسلم من مصدرهما")
+
+        if (!client.isConfigured) {
+            InfoCard(
+                title = "مصدر الحديث غير مربوط بعد",
+                body = "لن نعرض أحاديث تجريبية. يلزم نشر الخادم الوسيط وإضافة مفتاح Sunnah.com الرسمي إليه. لا تضع المفتاح داخل التطبيق."
+            )
+        } else if (!initialized && loading) {
+            InfoCard("جارٍ التحقق من مكتبة الحديث", "يتم جلب بيانات المجموعتين وعدد الأحاديث المتاحة من المصدر.")
+        } else if (error != null && bukhari == null && muslim == null) {
+            InfoCard("تعذّر الاتصال بالمصدر", error ?: "")
+        }
+
+        if (selectedBook != null && selectedCollection != null) {
+            val book = selectedBook!!
+            val collection = selectedCollection!!
+            val collectionTitle = if (collection == "bukhari") "صحيح البخاري" else "صحيح مسلم"
+            SimpleRow(
+                Icons.Outlined.ArrowBack,
+                "العودة إلى الكتب",
+                collectionTitle,
+                onClick = {
+                    selectedBook = null
+                    hadiths = emptyList()
+                    nextHadithPage = null
+                }
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                book.arabicName ?: book.englishName ?: "كتاب ${book.bookNumber}",
+                color = Gold,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                "عدد الأحاديث المتاحة في هذا الكتاب: ${book.numberOfHadith}",
+                color = Muted,
+                fontSize = 11.sp
+            )
+            Spacer(Modifier.height(12.dp))
+            hadiths.forEach { hadith ->
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
+                    shape = RoundedCornerShape(17.dp),
+                    colors = CardDefaults.cardColors(containerColor = Panel)
+                ) {
+                    Column(Modifier.padding(15.dp)) {
+                        Text(
+                            "حديث رقم ${hadith.hadithNumber}",
+                            color = Gold,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        hadith.texts.firstOrNull { it.language == "ar" }?.chapterTitle?.let { chapterTitle ->
+                            Text(chapterTitle, color = Muted, fontSize = 11.sp)
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            hadith.arabicText ?: "النص العربي غير متاح في استجابة المصدر.",
+                            color = MainText,
+                            fontSize = 18.sp,
+                            lineHeight = 32.sp,
+                            textAlign = TextAlign.Start
+                        )
+                        hadith.englishText?.let { english ->
+                            Spacer(Modifier.height(8.dp))
+                            Text(english, color = Muted, fontSize = 12.sp, lineHeight = 21.sp)
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        if (hadith.grades.isNotEmpty()) {
+                            Text(
+                                hadith.grades.joinToString(" · ") { "${it.grade} — ${it.gradedBy}" },
+                                color = Gold,
+                                fontSize = 10.sp
+                            )
+                        } else {
+                            Text("لا يتضمن سجل المصدر حكمًا منفصلًا لهذا الحديث.", color = Muted, fontSize = 10.sp)
+                        }
+                        Text(
+                            "المصدر: Sunnah.com · ${collectionTitle} · ${hadith.hadithNumber}",
+                            color = Muted,
+                            fontSize = 10.sp
+                        )
+                    }
+                }
+            }
+            if (loading) {
+                Text("جارٍ التحميل…", color = Muted, modifier = Modifier.padding(12.dp))
+            }
+            nextHadithPage?.let { page ->
+                Button(
+                    onClick = { loadHadithPage(collection, book, page, true) },
+                    enabled = !loading,
+                    colors = ButtonDefaults.buttonColors(containerColor = Emerald),
+                    shape = RoundedCornerShape(13.dp)
+                ) { Text("عرض المزيد من الأحاديث") }
+            }
+            if (hadiths.isEmpty() && !loading && error == null) {
+                InfoCard("لا توجد أحاديث في هذه الصفحة", "تحقق من تغطية الكتاب لدى المصدر.")
+            }
+        } else if (selectedCollection != null) {
+            val collection = selectedCollection!!
+            val title = if (collection == "bukhari") "صحيح البخاري" else "صحيح مسلم"
+            SimpleRow(
+                Icons.Outlined.ArrowBack,
+                "العودة إلى المجموعتين",
+                title,
+                onClick = { selectedCollection = null }
+            )
+            Spacer(Modifier.height(8.dp))
+            val books = if (collection == "bukhari") bukhariBooks else muslimBooks
+            books.forEach { book ->
+                SimpleRow(
+                    Icons.Outlined.LibraryBooks,
+                    book.arabicName ?: book.englishName ?: "كتاب ${book.bookNumber}",
+                    "${book.numberOfHadith} حديث متاح · ${book.hadithStartNumber}–${book.hadithEndNumber}",
+                    onClick = {
+                        selectedBook = book
+                        hadiths = emptyList()
+                        nextHadithPage = null
+                        loadHadithPage(collection, book, 1, false)
+                    }
+                )
+            }
+            if (books.isEmpty() && !loading) {
+                InfoCard("لا توجد كتب متاحة", error ?: "لم يُرجع المصدر قائمة كتب لهذه المجموعة.")
+            }
+        } else {
+            bukhari?.let { collection ->
+                SimpleRow(
+                    Icons.Outlined.LibraryBooks,
+                    collection.arabicTitle ?: "صحيح البخاري",
+                    "${collection.totalAvailableHadith} من ${collection.totalHadith} حديث متاح" +
+                        if (collection.isComplete) " · بيانات المجموعة كاملة حسب المصدر" else " · البيانات المتاحة جزئية",
+                    onClick = { selectedCollection = "bukhari" }
+                )
+            }
+            muslim?.let { collection ->
+                SimpleRow(
+                    Icons.Outlined.LibraryBooks,
+                    collection.arabicTitle ?: "صحيح مسلم",
+                    "${collection.totalAvailableHadith} من ${collection.totalHadith} حديث متاح" +
+                        if (collection.isComplete) " · بيانات المجموعة كاملة حسب المصدر" else " · البيانات المتاحة جزئية",
+                    onClick = { selectedCollection = "muslim" }
+                )
+            }
+            if (error != null && initialized) {
+                InfoCard("ملاحظة من المصدر", error ?: "")
+            }
+            if (bukhari != null || muslim != null) {
+                InfoCard(
+                    title = "التحقق من الاكتمال",
+                    body = "لا تُوصف أي مجموعة بأنها كاملة إلا إذا تطابق عدد الأحاديث المتاحة مع العدد الكلي المعلن من Sunnah.com. كل حديث يُعرض مع مرجعه، ولا نضيف درجة غير موجودة في المصدر."
+                )
+            }
+        }
         Spacer(Modifier.height(22.dp))
     }
 }
