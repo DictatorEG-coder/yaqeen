@@ -222,7 +222,12 @@ fun playQuranRecitation(controller: MediaController, startSurah: Int, source: Qu
 }
 
 @Composable
-fun QuranAudioPlayerBar(controller: MediaController?, modifier: Modifier = Modifier) {
+fun QuranAudioPlayerBar(
+    controller: MediaController?,
+    selectedSource: QuranAudioSource,
+    onSourceSelected: (QuranAudioSource) -> Unit,
+    modifier: Modifier = Modifier
+) {
     if (controller == null) return
 
     var isPlaying by remember(controller) { mutableStateOf(controller.isPlaying) }
@@ -235,6 +240,10 @@ fun QuranAudioPlayerBar(controller: MediaController?, modifier: Modifier = Modif
     var repeatMode by remember(controller) { mutableStateOf(controller.repeatMode) }
     var speedMenuExpanded by remember { mutableStateOf(false) }
     var timerMenuExpanded by remember { mutableStateOf(false) }
+    var sourceMenuExpanded by remember { mutableStateOf(false) }
+    var artist by remember(controller) {
+        mutableStateOf(controller.currentMediaItem?.mediaMetadata?.artist?.toString().orEmpty())
+    }
     var sleepTimerLabel by remember { mutableStateOf("مؤقت النوم") }
 
     DisposableEffect(controller) {
@@ -245,6 +254,7 @@ fun QuranAudioPlayerBar(controller: MediaController?, modifier: Modifier = Modif
 
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                 title = mediaItem?.mediaMetadata?.title?.toString().orEmpty()
+                artist = mediaItem?.mediaMetadata?.artist?.toString().orEmpty()
                 position = 0L
                 duration = controller.duration.coerceAtLeast(0L)
             }
@@ -294,7 +304,7 @@ fun QuranAudioPlayerBar(controller: MediaController?, modifier: Modifier = Modif
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                    Text("Quran Foundation · QuranicAudio · المنشاوي", color = AudioMuted, fontSize = 10.sp)
+                    Text(artist.ifBlank { "${selectedSource.reciterName} · ${selectedSource.style}" }, color = AudioMuted, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
                 IconButton(onClick = { controller.seekToPreviousMediaItem() }) {
                     Icon(Icons.Outlined.SkipPrevious, contentDescription = "السورة السابقة", tint = AudioGold)
@@ -310,6 +320,36 @@ fun QuranAudioPlayerBar(controller: MediaController?, modifier: Modifier = Modif
                 }
                 IconButton(onClick = { controller.seekToNextMediaItem() }) {
                     Icon(Icons.Outlined.SkipNext, contentDescription = "السورة التالية", tint = AudioGold)
+                }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Start
+            ) {
+                androidx.compose.foundation.layout.Box {
+                    TextButton(onClick = { sourceMenuExpanded = true }) {
+                        Text(
+                            "القارئ: ${selectedSource.reciterName} · ${selectedSource.style}",
+                            color = AudioGold,
+                            fontSize = 11.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = sourceMenuExpanded,
+                        onDismissRequest = { sourceMenuExpanded = false }
+                    ) {
+                        quranAudioSources.forEach { source ->
+                            DropdownMenuItem(
+                                text = { Text("${source.reciterName} · ${source.style}") },
+                                onClick = {
+                                    onSourceSelected(source)
+                                    sourceMenuExpanded = false
+                                }
+                            )
+                        }
+                    }
                 }
             }
             LinearProgressIndicator(
