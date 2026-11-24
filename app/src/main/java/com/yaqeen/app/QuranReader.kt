@@ -19,6 +19,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.Bookmark
+import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Card
@@ -141,7 +143,11 @@ private fun normalizeArabic(value: String): String {
 }
 
 @Composable
-fun QuranReaderScreen(modifier: Modifier = Modifier) {
+fun QuranReaderScreen(
+    modifier: Modifier = Modifier,
+    showBookmarksInitially: Boolean = false,
+    onBookmarksOpened: () -> Unit = {}
+) {
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
     var surahs by remember { mutableStateOf<List<QuranSurah>>(emptyList()) }
@@ -150,9 +156,17 @@ fun QuranReaderScreen(modifier: Modifier = Modifier) {
     var search by remember { mutableStateOf("") }
     var selectedSurah by remember { mutableStateOf<QuranSurah?>(null) }
     var selectedVerse by remember { mutableStateOf<Int?>(null) }
+    var bookmarkedKeys by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var showBookmarks by remember { mutableStateOf(showBookmarksInitially) }
+
+    LaunchedEffect(showBookmarksInitially) {
+        if (showBookmarksInitially) showBookmarks = true
+    }
 
     LaunchedEffect(Unit) {
         try {
+            bookmarkedKeys = context.getSharedPreferences(QURAN_PREFS, android.content.Context.MODE_PRIVATE)
+                .getStringSet("bookmarks", emptySet())?.toSet() ?: emptySet()
             surahs = withContext(Dispatchers.IO) { loadQuran(context.applicationContext) }
             loadError = !isCompleteQuran(surahs)
             if (!loadError) {
@@ -185,6 +199,30 @@ fun QuranReaderScreen(modifier: Modifier = Modifier) {
         else surahs.filter { normalizeArabic(it.name).contains(normalizedQuery) }
     }
 
+    val toggleBookmark: (QuranSurah, QuranVerse) -> Unit = { surah, verse ->
+        val key = "${surah.number}:${verse.number}"
+        val updated = bookmarkedKeys.toMutableSet()
+        if (!updated.add(key)) updated.remove(key)
+        bookmarkedKeys = updated
+        context.getSharedPreferences(QURAN_PREFS, android.content.Context.MODE_PRIVATE)
+            .edit()
+            .putStringSet("bookmarks", updated)
+            .apply()
+    }
+    val savedVerseEntries = remember(bookmarkedKeys, surahs) {
+        bookmarkedKeys.mapNotNull { key ->
+            val parts = key.split(":")
+            if (parts.size != 2) null
+            else {
+                val surahNumber = parts[0].toIntOrNull()
+                val verseNumber = parts[1].toIntOrNull()
+                val surah = surahs.firstOrNull { it.number == surahNumber }
+                val verse = surah?.verses?.firstOrNull { it.number == verseNumber }
+                if (surah != null && verse != null) surah to verse else null
+            }
+        }.sortedWith(compareBy({ it.first.number }, { it.second.number }))
+    }
+
     val current = selectedSurah
     LaunchedEffect(current?.number, selectedVerse) {
         current?.let { surah ->
@@ -195,6 +233,49 @@ fun QuranReaderScreen(modifier: Modifier = Modifier) {
                 .apply()
         }
     }
+    if (showBookmarks) {
+        Column(modifier = modifier.fillMaxSize().background(QuranInk).padding(horizontal = 16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 14.dp, bottom = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = { showBookmarks = false; onBookmarksOpened() }) {
+                    Icon(Icons.Outlined.ArrowBack, contentDescription = "العودة", tint = QuranGold)
+                }
+                Text("المحفوظات القرآنية", color = QuranGold, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            }
+            when {
+                loading -> Text("جارٍ تجهيز المحفوظات…", color = QuranMuted, modifier = Modifier.padding(16.dp))
+                loadError -> Text("تعذّر التحقق من المصحف، لذلك لم نعرض مواضع محفوظة.", color = QuranGold, modifier = Modifier.padding(16.dp))
+                savedVerseEntries.isEmpty() -> Text("لم تحفظ أي آية بعد. يمكنك حفظ الآيات من داخل المصحف.", color = QuranMuted, modifier = Modifier.padding(16.dp))
+                else -> LazyColumn {
+                    items(savedVerseEntries, key = { "${it.first.number}:${it.second.number}" }) { entry ->
+                        val surah = entry.first
+                        val verse = entry.second
+                        Card(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                                .clickable {
+                                    selectedSurah = surah
+                                    selectedVerse = verse.number
+                                    showBookmarks = false
+                                    onBookmarksOpened()
+                                },
+                            colors = CardDefaults.cardColors(containerColor = QuranPanel),
+                            shape = RoundedCornerShape(15.dp)
+                        ) {
+                            Column(Modifier.padding(14.dp)) {
+                                Text("${surah.name} · الآية ${verse.number}", color = QuranGold, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                Spacer(Modifier.height(7.dp))
+                                Text(displayVerseText(surah.number, verse), color = QuranWhite, fontSize = 20.sp, lineHeight = 36.sp)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return
+    }
+
     if (current != null) {
         val listState = rememberLazyListState()
         LaunchedEffect(current.number, selectedVerse) {
@@ -220,7 +301,9 @@ fun QuranReaderScreen(modifier: Modifier = Modifier) {
                     Text(current.name, color = QuranGold, fontSize = 22.sp, fontWeight = FontWeight.Bold)
                     Text("سورة رقم ${current.number} · ${current.verses.size} آية", color = QuranMuted, fontSize = 11.sp)
                 }
-                Spacer(Modifier.size(48.dp))
+                IconButton(onClick = { showBookmarks = true }) {
+                    Icon(Icons.Outlined.BookmarkBorder, contentDescription = "المحفوظات", tint = QuranGold)
+                }
             }
             LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
                 if (current.number != 1 && current.number != 9) {
@@ -255,11 +338,24 @@ fun QuranReaderScreen(modifier: Modifier = Modifier) {
                             textAlign = TextAlign.Start
                         )
                         Spacer(Modifier.height(9.dp))
-                        Box(
-                            modifier = Modifier.size(27.dp).background(QuranEmerald, CircleShape),
-                            contentAlignment = Alignment.Center
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(verse.number.toString(), color = Color.White, fontSize = 11.sp)
+                            Box(
+                                modifier = Modifier.size(27.dp).background(QuranEmerald, CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(verse.number.toString(), color = Color.White, fontSize = 11.sp)
+                            }
+                            IconButton(onClick = { toggleBookmark(current, verse) }) {
+                                Icon(
+                                    if ("${current.number}:${verse.number}" in bookmarkedKeys) Icons.Outlined.Bookmark else Icons.Outlined.BookmarkBorder,
+                                    contentDescription = "حفظ الآية",
+                                    tint = QuranGold
+                                )
+                            }
                         }
                     }
                 }
@@ -279,7 +375,16 @@ fun QuranReaderScreen(modifier: Modifier = Modifier) {
     }
 
     Column(modifier = modifier.fillMaxSize().background(QuranInk).padding(horizontal = 16.dp)) {
-        Text("القرآن الكريم", modifier = Modifier.padding(top = 22.dp), color = QuranGold, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(top = 22.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text("القرآن الكريم", color = QuranGold, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+            IconButton(onClick = { showBookmarks = true }) {
+                Icon(Icons.Outlined.BookmarkBorder, contentDescription = "المحفوظات", tint = QuranGold)
+            }
+        }
         Text("مصحف كامل · ١١٤ سورة · ٦٢٣٦ آية", modifier = Modifier.padding(top = 5.dp, bottom = 16.dp), color = QuranMuted, fontSize = 12.sp)
         OutlinedTextField(
             value = search,
