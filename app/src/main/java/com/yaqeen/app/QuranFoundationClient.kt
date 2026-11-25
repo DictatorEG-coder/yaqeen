@@ -1,7 +1,6 @@
 package com.yaqeen.app
 
 import android.content.Context
-import androidx.core.text.HtmlCompat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -25,18 +24,14 @@ internal data class QFTafsirEntry(
 )
 
 internal fun parseOfflineMuyassarTafsir(json: String, verseKey: String): QFTafsirEntry? {
-    if (!verseKey.matches(Regex("^\\\\d{1,3}:\\\\d{1,3}$"))) return null
+    if (!verseKey.matches(Regex("^\\d{1,3}:\\d{1,3}$"))) return null
     val parts = verseKey.split(":")
     val verse = JSONObject(json).optJSONObject("verses")
         ?.optJSONObject(parts[0])?.optJSONObject(parts[1]) ?: return null
     val rawText = verse.optString("text").takeIf { it.isNotBlank() && it != "null" } ?: return null
     val rawFootnotes = verse.optString("footnotes").takeIf { it.isNotBlank() && it != "null" }
-    val renderedText = HtmlCompat.fromHtml(rawText, HtmlCompat.FROM_HTML_MODE_LEGACY).toString().trim()
-    val renderedFootnotes = rawFootnotes?.let {
-        HtmlCompat.fromHtml(it, HtmlCompat.FROM_HTML_MODE_LEGACY).toString().trim()
-    }
-    val completeText = listOfNotNull(renderedText, renderedFootnotes?.takeIf { it.isNotBlank() })
-        .joinToString("\\n\\n")
+    val completeText = listOfNotNull(rawText, rawFootnotes)
+        .joinToString("\n\n")
     return QFTafsirEntry(verseKey, "التفسير الميسر", "QuranEnc.com · الإصدار 1.0.0", completeText)
 }
 
