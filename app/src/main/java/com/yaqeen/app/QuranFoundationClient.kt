@@ -33,7 +33,7 @@ private fun parseOfflineMuyassarTafsir(root: JSONObject, verseKey: String): QFTa
         ?.optJSONObject(parts[0])?.optJSONObject(parts[1]) ?: return null
     val rawText = verse.optString("text").takeIf { it.isNotBlank() && it != "null" } ?: return null
     val rawFootnotes = verse.optString("footnotes").takeIf { it.isNotBlank() && it != "null" }
-    val completeText = listOfNotNull(rawText, rawFootnotes).joinToString("\\n\\n")
+    val completeText = listOfNotNull(rawText, rawFootnotes).joinToString("\n\n")
     return QFTafsirEntry(verseKey, "التفسير الميسر", "QuranEnc.com · الإصدار 1.0.0", completeText)
 }
 
