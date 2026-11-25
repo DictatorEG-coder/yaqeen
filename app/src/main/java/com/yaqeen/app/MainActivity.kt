@@ -460,23 +460,12 @@ private fun AdhkarScreen(modifier: Modifier = Modifier) {
     val categories = remember { verifiedAdhkarEntries.map { it.category }.distinct() }
     val query = search.trim()
     // Search across the actual dhikr text as well as category titles, not just the index labels.
-    val matchingEntries = remember(query) {
-        if (query.isBlank()) emptyList()
-        else verifiedAdhkarEntries.filter { entry ->
-            entry.text.contains(query, ignoreCase = true) ||
-                entry.category.contains(query, ignoreCase = true)
-        }
-    }
+    val matchingEntries = remember(query) { filterAdhkarEntries(query) }
     val visibleCategories = remember(categories, query, matchingEntries) {
         if (query.isBlank()) categories
         else categories.filter { category -> matchingEntries.any { it.category == category } }
     }
-    val entries = remember(selectedCategory, query) {
-        verifiedAdhkarEntries.filter { entry ->
-            (selectedCategory == null || entry.category == selectedCategory) &&
-                (query.isBlank() || entry.text.contains(query, ignoreCase = true) || entry.category.contains(query, ignoreCase = true))
-        }
-    }
+    val entries = remember(selectedCategory, query) { filterAdhkarEntries(query, selectedCategory) }
     LaunchedEffect(Unit) {
         while (true) {
             delay(60_000)
