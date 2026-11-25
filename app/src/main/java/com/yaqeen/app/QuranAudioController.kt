@@ -103,7 +103,7 @@ class QuranPlaybackService : MediaSessionService() {
             activeInstance?.cancelTimer()
         }
 
-        fun enqueueDownload(source: QuranAudioSource, surahNumber: Int): Boolean {
+        internal fun enqueueDownload(source: QuranAudioSource, surahNumber: Int): Boolean {
             if (surahNumber !in 1..114) return false
             val manager = activeInstance?.downloadManager ?: return false
             val request = DownloadRequest.Builder(
