@@ -22,6 +22,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -42,9 +43,24 @@ private val ListenText = Color(0xFFF1F3EF)
 @Composable
 internal fun QuranListeningScreen(modifier: Modifier = Modifier) {
     val controller = rememberQuranMediaController()
-    val grouped = remember { quranAudioSources.groupBy { it.reciterName } }
+    var recordings by remember { mutableStateOf<List<QuranRecording>>(emptyList()) }
+    var loadingCatalog by remember { mutableStateOf(true) }
+    var catalogError by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        runCatching { Mp3QuranCatalogClient.fetchRecitations() }
+            .onSuccess { recordings = it }
+            .onFailure { catalogError = true }
+        loadingCatalog = false
+    }
+    val activeRecordings = if (recordings.isNotEmpty()) recordings else quranAudioSources.map {
+        QuranRecording(it, (1..114).toList())
+    }
+    val availableSources = activeRecordings.map { it.source }
+    val grouped = activeRecordings.groupBy { it.source.reciterName }
     var selectedReciter by remember { mutableStateOf<String?>(null) }
     var selectedSource by remember { mutableStateOf<QuranAudioSource?>(null) }
+    var selectedSurahs by remember { mutableStateOf((1..114).toList()) }
+    var reciterSearch by remember { mutableStateOf("") }
     var search by remember { mutableStateOf("") }
     val surahs = remember { surahNames.mapIndexed { index, name -> (index + 1) to name } }
     val filteredSurahs = surahs.filter { it.second.contains(search.trim(), ignoreCase = true) }
