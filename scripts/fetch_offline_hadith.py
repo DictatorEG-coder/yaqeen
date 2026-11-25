@@ -78,7 +78,10 @@ def main() -> None:
     seen = set()
     total = 0
     with zipfile.ZipFile(io.BytesIO(archive_bytes)) as archive:
-        for filename in archive.namelist():
+        json_files = [name for name in archive.namelist() if name.lower().endswith(".json")]
+        # Prefer the combined collection files over per-book JSON duplicates.
+        json_files.sort(key=lambda name: ("collections" not in name.lower(), name))
+        for filename in json_files:
             if not filename.lower().endswith(".json"):
                 continue
             try:
