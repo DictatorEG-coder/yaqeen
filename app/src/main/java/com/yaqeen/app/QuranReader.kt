@@ -335,7 +335,7 @@ fun QuranReaderScreen(
                                 lineHeight = 25.sp
                             )
                             Spacer(Modifier.height(8.dp))
-                            Text("المصدر: Quran Foundation · التفسير المنقول كما ورد من المصدر", color = QuranMuted, fontSize = 10.sp)
+                            Text("النص والهوامش كما وردت من المصدر المذكور أعلاه.", color = QuranMuted, fontSize = 10.sp)
                         }
                     }
                 }
