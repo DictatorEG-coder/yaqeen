@@ -33,6 +33,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.text.Normalizer
 
 private val ListenBackground = Color(0xFF090E0B)
 private val ListenPanel = Color(0xFF141D18)
@@ -43,6 +47,9 @@ private val ListenText = Color(0xFFF1F3EF)
 @Composable
 internal fun QuranListeningScreen(modifier: Modifier = Modifier) {
     val controller = rememberQuranMediaController()
+    val context = LocalContext.current
+    var quranTextData by remember { mutableStateOf<List<QuranSurah>>(emptyList()) }
+    LaunchedEffect(context) { quranTextData = withContext(Dispatchers.IO) { loadQuran(context) } }
     var recordings by remember { mutableStateOf<List<QuranRecording>>(emptyList()) }
     var loadingCatalog by remember { mutableStateOf(true) }
     var catalogError by remember { mutableStateOf(false) }
@@ -63,7 +70,14 @@ internal fun QuranListeningScreen(modifier: Modifier = Modifier) {
     var reciterSearch by remember { mutableStateOf("") }
     var search by remember { mutableStateOf("") }
     val surahs = remember { surahNames.mapIndexed { index, name -> (index + 1) to name } }
-    val filteredSurahs = surahs.filter { it.second.contains(search.trim(), ignoreCase = true) }
+    val normalizedQuery = remember(search) { normalizeListenSearch(search) }
+    val filteredSurahs = surahs.filter { item ->
+        search.isBlank() ||
+            normalizeListenSearch(item.second).contains(normalizedQuery) ||
+            quranTextData.firstOrNull { it.number == item.first }?.verses?.any {
+                normalizeListenSearch(it.text).contains(normalizedQuery)
+            } == true
+    }
 
     Column(
         modifier = modifier.fillMaxSize().background(ListenBackground)
@@ -113,7 +127,7 @@ internal fun QuranListeningScreen(modifier: Modifier = Modifier) {
                     onValueChange = { search = it },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    label = { Text("ابحث باسم السورة") }
+                    label = { Text("ابحث باسم السورة أو جزء من آية") }
                 )
                 Spacer(Modifier.height(12.dp))
                 Text("اختر السورة", color = ListenText, fontSize = 17.sp, fontWeight = FontWeight.Bold)
