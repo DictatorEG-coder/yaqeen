@@ -1,6 +1,7 @@
 package com.yaqeen.app
 
 import android.content.ComponentName
+import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import androidx.compose.foundation.clickable
@@ -46,7 +47,23 @@ import androidx.core.content.ContextCompat
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
+import androidx.media3.common.MimeTypes
 import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.database.StandaloneDatabaseProvider
+import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.datasource.cache.CacheDataSource
+import androidx.media3.datasource.cache.NoOpCacheEvictor
+import androidx.media3.datasource.cache.SimpleCache
+import androidx.media3.exoplayer.offline.Download
+import androidx.media3.exoplayer.offline.DownloadManager
+import androidx.media3.exoplayer.offline.DownloadRequest
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import java.io.File
+import java.util.concurrent.Executors
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaController
@@ -67,9 +84,12 @@ internal fun sleepTimerDelayMs(minutes: Int): Long {
     return minutes.toLong() * 60_000L
 }
 
+@OptIn(UnstableApi::class)
 class QuranPlaybackService : MediaSessionService() {
     companion object {
         @Volatile private var activeInstance: QuranPlaybackService? = null
+        private val mutableDownloads = MutableStateFlow<List<Download>>(emptyList())
+        val downloads: StateFlow<List<Download>> = mutableDownloads.asStateFlow()
 
         fun scheduleSleepTimer(minutes: Int): Boolean {
             if (minutes !in 1..180) return false
@@ -81,21 +101,115 @@ class QuranPlaybackService : MediaSessionService() {
         fun cancelSleepTimer() {
             activeInstance?.cancelTimer()
         }
+
+        fun enqueueDownload(source: QuranAudioSource, surahNumber: Int): Boolean {
+            if (surahNumber !in 1..114) return false
+            val manager = activeInstance?.downloadManager ?: return false
+            val request = DownloadRequest.Builder(
+                "quran-${source.id}-${surahNumber}",
+                Uri.parse(quranAudioUrl(source.id, surahNumber))
+            ).setMimeType(MimeTypes.AUDIO_MPEG).build()
+            manager.addDownload(request)
+            return true
+        }
+
+        fun pauseDownloads(): Boolean {
+            val manager = activeInstance?.downloadManager ?: return false
+            manager.pauseDownloads()
+            return true
+        }
+
+        fun resumeDownloads(): Boolean {
+            val manager = activeInstance?.downloadManager ?: return false
+            manager.resumeDownloads()
+            return true
+        }
+
+        fun removeDownload(downloadId: String): Boolean {
+            val manager = activeInstance?.downloadManager ?: return false
+            manager.removeDownload(downloadId)
+            return true
+        }
     }
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private var sleepTask: Runnable? = null
     private var mediaSession: MediaSession? = null
+    private var downloadManager: DownloadManager? = null
+    private var audioCache: SimpleCache? = null
+    private var downloadListener: DownloadManager.Listener? = null
 
     override fun onCreate() {
         super.onCreate()
         activeInstance = this
-        val player = ExoPlayer.Builder(this).build()
+
+        val databaseProvider = StandaloneDatabaseProvider(this)
+        val cache = SimpleCache(
+            File(cacheDir, "yaqeen_quran_audio"),
+            NoOpCacheEvictor(),
+            databaseProvider
+        )
+        audioCache = cache
+        val upstreamFactory = DefaultHttpDataSource.Factory()
+            .setUserAgent("YaqeenAndroid/0.2.0")
+            .setConnectTimeoutMs(15_000)
+            .setReadTimeoutMs(30_000)
+
+        val manager = DownloadManager(
+            this,
+            databaseProvider,
+            cache,
+            upstreamFactory,
+            Executors.newFixedThreadPool(2)
+        )
+        manager.maxParallelDownloads = 2
+        downloadManager = manager
+        val listener = object : DownloadManager.Listener {
+            override fun onInitialized(downloadManager: DownloadManager) {
+                refreshDownloads(downloadManager)
+            }
+
+            override fun onDownloadChanged(
+                downloadManager: DownloadManager,
+                download: Download,
+                finalException: Exception?
+            ) {
+                refreshDownloads(downloadManager)
+            }
+
+            override fun onDownloadRemoved(downloadManager: DownloadManager, download: Download) {
+                refreshDownloads(downloadManager)
+            }
+        }
+        downloadListener = listener
+        manager.addListener(listener)
+        manager.resumeDownloads()
+
+        val cacheDataSourceFactory = CacheDataSource.Factory()
+            .setCache(cache)
+            .setUpstreamDataSourceFactory(upstreamFactory)
+        val player = ExoPlayer.Builder(this)
+            .setMediaSourceFactory(DefaultMediaSourceFactory(cacheDataSourceFactory))
+            .build()
         player.setAudioAttributes(AudioAttributes.DEFAULT, true)
         player.setHandleAudioBecomingNoisy(true)
         mediaSession = MediaSession.Builder(this, player)
             .setId("yaqeen-quran-player")
             .build()
+    }
+
+    @OptIn(UnstableApi::class)
+    private fun refreshDownloads(manager: DownloadManager) {
+        runCatching {
+            val cursor = manager.downloadIndex.getDownloads()
+            val values = mutableListOf<Download>()
+            try {
+                while (cursor.moveToNext()) values += cursor.download
+            } finally {
+                cursor.close()
+            }
+            mutableDownloads.value = values.sortedBy { it.request.id }
+        }
     }
 
     private fun scheduleTimer(minutes: Int) {
@@ -118,11 +232,16 @@ class QuranPlaybackService : MediaSessionService() {
     override fun onDestroy() {
         cancelTimer()
         if (activeInstance === this) activeInstance = null
+        downloadListener?.let { listener -> downloadManager?.removeListener(listener) }
+        downloadManager?.release()
+        downloadManager = null
         mediaSession?.let { session ->
             session.player.release()
             session.release()
         }
         mediaSession = null
+        audioCache?.release()
+        audioCache = null
         super.onDestroy()
     }
 }
