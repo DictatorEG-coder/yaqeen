@@ -3,6 +3,7 @@ package com.yaqeen.app
 import android.content.ComponentName
 import android.os.Handler
 import android.os.Looper
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
