@@ -129,7 +129,7 @@ private fun YaqeenApp(initialSurahNumber: Int = 0, openFridayReminders: Boolean 
                         val tabs = listOf(
                             Triple("الرئيسية", Icons.Outlined.Home, 0),
                             Triple("القرآن", Icons.Outlined.MenuBook, 1),
-                            Triple("السنة", Icons.Outlined.LibraryBooks, 2),
+                            Triple("الأحاديث", Icons.Outlined.LibraryBooks, 2),
                             Triple("الأذكار", Icons.Outlined.Bookmarks, 3),
                             Triple("التذكيرات", Icons.Outlined.NotificationsNone, 4),
                             Triple("المزيد", Icons.Outlined.MoreHoriz, 5)
