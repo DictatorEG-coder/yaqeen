@@ -304,13 +304,13 @@ internal fun playQuranFoundationPlaylist(
     controller.play()
 }
 
-internal fun playQuranRecitation(controller: MediaController, startSurah: Int, source: QuranAudioSource) {
+internal fun playQuranRecitation(controller: MediaController, startSurah: Int, source: QuranAudioSource, availableSurahs: List<Int> = (1..114).toList()) {
     require(startSurah in 1..114) { "Surah number must be between 1 and 114" }
     val playlist = surahNames.mapIndexed { index, name ->
         val number = index + 1
         MediaItem.Builder()
             .setMediaId("${source.id}-$number")
-            .setUri(quranAudioUrl(source.id, number))
+            .setUri(source.baseUrl + String.format(Locale.US, "%03d.mp3", number))
             .setMediaMetadata(
                 MediaMetadata.Builder()
                     .setTitle(name)
@@ -444,7 +444,7 @@ internal fun QuranAudioPlayerBar(
                         expanded = sourceMenuExpanded,
                         onDismissRequest = { sourceMenuExpanded = false }
                     ) {
-                        quranAudioSources.forEach { source ->
+                        availableSources.forEach { source ->
                             DropdownMenuItem(
                                 text = { Text("${source.reciterName} · ${source.style}") },
                                 onClick = {
