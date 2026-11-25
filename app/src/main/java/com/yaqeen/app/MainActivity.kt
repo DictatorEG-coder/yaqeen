@@ -628,6 +628,72 @@ private fun MoreScreen(modifier: Modifier = Modifier, onOpenBookmarks: () -> Uni
 }
 
 @Composable
+private fun DailyReminderCard(kind: DailyReminderKind) {
+    val context = LocalContext.current
+    var enabled by remember { mutableStateOf(DailyReminderScheduler.enabled(context, kind)) }
+    var mode by remember { mutableStateOf(DailyReminderScheduler.mode(context, kind)) }
+    var hour by remember { mutableIntStateOf(DailyReminderScheduler.hour(context, kind)) }
+    var minute by remember { mutableIntStateOf(DailyReminderScheduler.minute(context, kind)) }
+    var interval by remember { mutableIntStateOf(DailyReminderScheduler.interval(context, kind)) }
+    var permissionDenied by remember { mutableStateOf(false) }
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        permissionDenied = !granted
+        if (granted) {
+            DailyReminderScheduler.configure(context, kind, true, mode, hour, minute, interval)
+            enabled = true
+        }
+    }
+    fun save(nextEnabled: Boolean = enabled) {
+        DailyReminderScheduler.configure(context, kind, nextEnabled, mode, hour, minute, interval)
+        enabled = nextEnabled
+    }
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
+        shape = RoundedCornerShape(17.dp),
+        colors = CardDefaults.cardColors(containerColor = Panel)
+    ) {
+        Column(Modifier.padding(15.dp)) {
+            Text(kind.title, color = Gold, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+            Text(kind.message, color = Muted, fontSize = 11.sp, lineHeight = 19.sp)
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                OutlinedButton(onClick = {
+                    mode = "interval"
+                    interval = if (interval >= 24) 1 else when (interval) {
+                        1 -> 2; 2 -> 3; 3 -> 4; 4 -> 6; 6 -> 8; 8 -> 12; 12 -> 24; else -> 1
+                    }
+                    if (enabled) save()
+                }, shape = RoundedCornerShape(10.dp)) {
+                    Text("كل $interval ساعة", color = if (mode == "interval") Gold else Muted, fontSize = 11.sp)
+                }
+                OutlinedButton(onClick = {
+                    mode = "daily"
+                    TimePickerDialog(context, { _, h, m -> hour = h; minute = m; if (enabled) save() }, hour, minute, false).show()
+                }, shape = RoundedCornerShape(10.dp)) {
+                    Text("وقت يومي %02d:%02d".format(hour, minute), color = if (mode == "daily") Gold else Muted, fontSize = 11.sp)
+                }
+            }
+            Spacer(Modifier.height(7.dp))
+            if (enabled) {
+                OutlinedButton(onClick = { save(false) }, shape = RoundedCornerShape(10.dp)) {
+                    Text("إيقاف التذكير", color = MainText)
+                }
+            } else {
+                Button(onClick = {
+                    if (Build.VERSION.SDK_INT >= 33 &&
+                        context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+                    ) permissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                    else { save(true); permissionDenied = false }
+                }, colors = ButtonDefaults.buttonColors(containerColor = Emerald), shape = RoundedCornerShape(10.dp)) {
+                    Text("تفعيل التذكير", color = MainText)
+                }
+            }
+            if (permissionDenied) Text("إذن الإشعارات غير ممنوح.", color = Gold, fontSize = 10.sp)
+        }
+    }
+}
+
+@Composable
 private fun FridayReminderCard(
     kind: FridayReminderKind,
     title: String,
@@ -956,8 +1022,7 @@ private fun RemindersScreen(modifier: Modifier = Modifier) {
         FridayHadithCard()
         SectionHeading("التذكيرات اليومية")
         Spacer(Modifier.height(8.dp))
-        SalawatReminderCard()
-        InfoCard("بقية التذكيرات", "تذكير الحديث والسنة المهجورة وقيام الليل وقراءة القرآن وأذكار الصباح والمساء لم تُنفذ بعد كجداول مستقلة.")
+        DailyReminderKind.entries.forEach { kind -> DailyReminderCard(kind) }
         Spacer(Modifier.height(22.dp))
     }
 }
