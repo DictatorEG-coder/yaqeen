@@ -99,10 +99,20 @@ internal val surahNames = listOf(
     "النصر", "المسد", "الإخلاص", "الفلق", "الناس"
 )
 
+@Volatile
+private var cachedQuranData: List<QuranSurah>? = null
+
+private val quranCacheLock = Any()
+
 internal fun loadQuran(context: android.content.Context): List<QuranSurah> {
-    val rawText = context.assets.open("quran-uthmani.txt")
-        .bufferedReader(Charsets.UTF_8).use { it.readText() }
-    return parseQuran(rawText)
+    cachedQuranData?.let { return it }
+    return synchronized(quranCacheLock) {
+        cachedQuranData ?: run {
+            val rawText = context.assets.open("quran-uthmani.txt")
+                .bufferedReader(Charsets.UTF_8).use { it.readText() }
+            parseQuran(rawText).also { cachedQuranData = it }
+        }
+    }
 }
 
 internal fun parseQuran(rawText: String): List<QuranSurah> {
