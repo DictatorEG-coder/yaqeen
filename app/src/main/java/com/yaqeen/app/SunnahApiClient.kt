@@ -183,8 +183,9 @@ internal class SunnahApiClient(
 
     private fun validateCollection(collection: String): String {
         val normalized = collection.trim().lowercase()
-        require(normalized == "bukhari" || normalized == "muslim") {
-            "Only Sahih al-Bukhari and Sahih Muslim are enabled"
+        val supported = setOf("bukhari", "muslim", "abudawud", "tirmidhi", "nasai", "ibnmajah")
+        require(normalized in supported) {
+            "Unsupported hadith collection: $normalized"
         }
         return normalized
     }
