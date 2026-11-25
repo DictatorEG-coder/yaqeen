@@ -64,7 +64,6 @@ def main() -> None:
             reference TEXT,
             chapter_name_ar TEXT,
             text_ar TEXT NOT NULL,
-            matn_ar TEXT,
             narrator TEXT,
             grade_ar TEXT,
             source_reference TEXT,
@@ -72,7 +71,6 @@ def main() -> None:
             search_text TEXT NOT NULL
         );
         CREATE INDEX idx_hadith_collection_book ON hadiths(collection_id, book_number, id);
-        CREATE INDEX idx_hadith_collection_number ON hadiths(collection_id, hadith_number);
     """)
 
     seen = set()
@@ -118,11 +116,11 @@ def main() -> None:
                 source_reference = clean(item.get("source_reference"))
                 url_source = clean(item.get("url_source"))
                 searchable = normalize_arabic(" ".join(filter(None, [
-                    text_ar, matn_ar, number, chapter_name, book_name, narrator, reference
+                    matn_ar or text_ar, number, chapter_name, book_name, narrator, reference
                 ])))
                 hadith_rows.append((
                     collection_id, book_number, chapter_number, number, reference,
-                    chapter_name, text_ar, matn_ar, narrator, grade_ar,
+                    chapter_name, text_ar, narrator, grade_ar,
                     source_reference, url_source, searchable
                 ))
                 collection_count += 1
