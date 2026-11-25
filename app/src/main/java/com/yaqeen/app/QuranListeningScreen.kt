@@ -9,8 +9,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -156,22 +159,35 @@ internal fun QuranListeningScreen(
                     Text("تنزيل كل السور المتاحة · ${selectedSurahs.size}", color = ListenBackground)
                 }
                 Spacer(Modifier.height(8.dp))
-                filteredSurahs.forEach { (number, name) ->
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        ListenChoice(
-                            Icons.Outlined.PlayCircleOutline,
-                            name,
-                            "تشغيل السورة",
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            val player = controller
-                            if (player != null) playQuranRecitation(player, number, source, selectedSurahs)
-                        }
-                        IconButton(
-                            enabled = controller != null,
-                            onClick = { QuranPlaybackService.enqueueDownload(source, number) }
-                        ) {
-                            Icon(Icons.Outlined.Download, contentDescription = "تنزيل سورة $name", tint = ListenGold)
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 430.dp)
+                ) {
+                    items(filteredSurahs, key = { it.first }) { (number, name) ->
+                        val downloadId = "quran-${source.id}-${number}"
+                        val currentDownload = downloads.firstOrNull { it.request.id == downloadId }
+                        val alreadyComplete = currentDownload?.state == androidx.media3.exoplayer.offline.Download.STATE_COMPLETED
+                        val alreadyQueued = currentDownload?.state == androidx.media3.exoplayer.offline.Download.STATE_QUEUED ||
+                            currentDownload?.state == androidx.media3.exoplayer.offline.Download.STATE_DOWNLOADING
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            ListenChoice(
+                                Icons.Outlined.PlayCircleOutline,
+                                name,
+                                "تشغيل السورة",
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                val player = controller
+                                if (player != null) playQuranRecitation(player, number, source, selectedSurahs)
+                            }
+                            IconButton(
+                                enabled = controller != null && !alreadyComplete && !alreadyQueued,
+                                onClick = { QuranPlaybackService.enqueueDownload(source, number) }
+                            ) {
+                                Icon(
+                                    Icons.Outlined.Download,
+                                    contentDescription = if (alreadyComplete) "تم تنزيل سورة $name" else "تنزيل سورة $name",
+                                    tint = if (alreadyComplete) ListenMuted else ListenGold
+                                )
+                            }
                         }
                     }
                 }
@@ -189,39 +205,41 @@ internal fun QuranListeningScreen(
                             Text("استئناف الجميع", color = ListenGold, fontSize = 11.sp)
                         }
                     }
-                    sourceDownloads.forEach { download ->
-                        val surahNumber = download.request.id.substringAfterLast('-').toIntOrNull()
-                        val surahName = surahNumber?.let { surahNames.getOrNull(it - 1) } ?: "تلاوة"
-                        val status = when (download.state) {
-                            androidx.media3.exoplayer.offline.Download.STATE_COMPLETED -> "مكتملة · متاحة دون إنترنت"
-                            androidx.media3.exoplayer.offline.Download.STATE_DOWNLOADING -> "جارٍ التنزيل"
-                            androidx.media3.exoplayer.offline.Download.STATE_QUEUED -> "في الانتظار أو متوقفة مؤقتًا"
-                            androidx.media3.exoplayer.offline.Download.STATE_FAILED -> "فشل التنزيل · يمكنك إعادة المحاولة"
-                            else -> "قيد المعالجة"
-                        }
-                        Card(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                            colors = CardDefaults.cardColors(containerColor = ListenPanel),
-                            shape = RoundedCornerShape(13.dp)
-                        ) {
-                            Column(Modifier.padding(12.dp)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Column(Modifier.weight(1f)) {
-                                        Text(surahName, color = ListenText, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                                        Text(status, color = ListenMuted, fontSize = 10.sp)
+                    LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 280.dp)) {
+                        items(sourceDownloads, key = { it.request.id }) { download ->
+                            val surahNumber = download.request.id.substringAfterLast('-').toIntOrNull()
+                            val surahName = surahNumber?.let { surahNames.getOrNull(it - 1) } ?: "تلاوة"
+                            val status = when (download.state) {
+                                androidx.media3.exoplayer.offline.Download.STATE_COMPLETED -> "مكتملة · متاحة دون إنترنت"
+                                androidx.media3.exoplayer.offline.Download.STATE_DOWNLOADING -> "جارٍ التنزيل"
+                                androidx.media3.exoplayer.offline.Download.STATE_QUEUED -> "في الانتظار أو متوقفة مؤقتًا"
+                                androidx.media3.exoplayer.offline.Download.STATE_FAILED -> "فشل التنزيل · يمكنك إعادة المحاولة"
+                                else -> "قيد المعالجة"
+                            }
+                            Card(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                colors = CardDefaults.cardColors(containerColor = ListenPanel),
+                                shape = RoundedCornerShape(13.dp)
+                            ) {
+                                Column(Modifier.padding(12.dp)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Column(Modifier.weight(1f)) {
+                                            Text(surahName, color = ListenText, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                                            Text(status, color = ListenMuted, fontSize = 10.sp)
+                                        }
+                                        IconButton(onClick = { QuranPlaybackService.removeDownload(download.request.id) }) {
+                                            Icon(Icons.Outlined.DeleteOutline, contentDescription = "حذف التنزيل", tint = ListenMuted)
+                                        }
                                     }
-                                    IconButton(onClick = { QuranPlaybackService.removeDownload(download.request.id) }) {
-                                        Icon(Icons.Outlined.DeleteOutline, contentDescription = "حذف التنزيل", tint = ListenMuted)
+                                    if (download.state != androidx.media3.exoplayer.offline.Download.STATE_COMPLETED) {
+                                        val progress = (download.percentDownloaded / 100f).coerceIn(0f, 1f)
+                                        LinearProgressIndicator(
+                                            progress = progress,
+                                            modifier = Modifier.fillMaxWidth(),
+                                            color = ListenGold,
+                                            trackColor = ListenMuted.copy(alpha = 0.2f)
+                                        )
                                     }
-                                }
-                                if (download.state != androidx.media3.exoplayer.offline.Download.STATE_COMPLETED) {
-                                    val progress = (download.percentDownloaded / 100f).coerceIn(0f, 1f)
-                                    LinearProgressIndicator(
-                                        progress = progress,
-                                        modifier = Modifier.fillMaxWidth(),
-                                        color = ListenGold,
-                                        trackColor = ListenMuted.copy(alpha = 0.2f)
-                                    )
                                 }
                             }
                         }
