@@ -12,6 +12,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Pause
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.RepeatOne
+import androidx.compose.material.icons.outlined.Replay10
+import androidx.compose.material.icons.outlined.Forward10
 import androidx.compose.material.icons.outlined.SkipNext
 import androidx.compose.material.icons.outlined.SkipPrevious
 import androidx.compose.material3.Card
@@ -21,6 +23,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -492,12 +495,37 @@ internal fun QuranAudioPlayerBar(
                     }
                 }
             }
-            LinearProgressIndicator(
-                progress = progress,
-                modifier = Modifier.fillMaxWidth(),
-                color = AudioGold,
-                trackColor = AudioMuted.copy(alpha = 0.25f)
+            Slider(
+                value = progress,
+                onValueChange = { fraction ->
+                    if (duration > 0L) position = (fraction * duration).toLong()
+                },
+                onValueChangeFinished = { controller.seekTo(position) },
+                enabled = duration > 0L,
+                modifier = Modifier.fillMaxWidth()
             )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = { controller.seekTo((controller.currentPosition - 10_000L).coerceAtLeast(0L)) }) {
+                    Icon(Icons.Outlined.Replay10, contentDescription = "رجوع عشر ثوانٍ", tint = AudioGold)
+                }
+                Text(
+                    "${position / 60_000L}:%02d".format((position / 1_000L) % 60L),
+                    color = AudioMuted,
+                    fontSize = 10.sp
+                )
+                Text(
+                    "${duration / 60_000L}:%02d".format((duration / 1_000L) % 60L),
+                    color = AudioMuted,
+                    fontSize = 10.sp
+                )
+                IconButton(onClick = { controller.seekTo((controller.currentPosition + 10_000L).coerceAtMost(duration)) }) {
+                    Icon(Icons.Outlined.Forward10, contentDescription = "تقديم عشر ثوانٍ", tint = AudioGold)
+                }
+            }
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
