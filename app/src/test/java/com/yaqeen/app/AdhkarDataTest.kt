@@ -20,6 +20,22 @@ class AdhkarDataTest {
     }
 
     @Test
+    fun searchFindsDhikrTextWithoutArabicDiacritics() {
+        val results = filterAdhkarEntries("الحمد لله")
+        assertTrue(results.isNotEmpty())
+        assertTrue(results.all { normalizeAdhkarSearch(it.text).contains("الحمد لله") ||
+            normalizeAdhkarSearch(it.category).contains("الحمد لله") })
+    }
+
+    @Test
+    fun categoryFilterAndTextSearchCanBeCombined() {
+        val category = verifiedAdhkarEntries.first().category
+        val results = filterAdhkarEntries("الله", category)
+        assertTrue(results.isNotEmpty())
+        assertTrue(results.all { it.category == category })
+    }
+
+    @Test
     fun dailyCounterKeysAreSeparatedByDateAndDhikr() {
         assertEquals("adhkar:20261124:hisn_28_1", adhkarStorageKey("20261124", "hisn_28_1"))
         assertTrue(adhkarStorageKey("20261124", "hisn_28_1") != adhkarStorageKey("20261125", "hisn_28_1"))
