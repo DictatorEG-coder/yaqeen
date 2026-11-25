@@ -121,7 +121,7 @@ internal fun QuranListeningScreen(modifier: Modifier = Modifier) {
                     ListenChoice(Icons.Outlined.PlayCircleOutline, name, "تشغيل السورة") {
                         val player = controller
                         val source = selectedSource
-                        if (player != null && source != null) playQuranRecitation(player, number, source)
+                        if (player != null && source != null) playQuranRecitation(player, number, source, selectedSurahs)
                     }
                 }
                 Spacer(Modifier.height(12.dp))
@@ -132,11 +132,13 @@ internal fun QuranListeningScreen(modifier: Modifier = Modifier) {
                     onSourceSelected = {
                         selectedSource = it
                         selectedReciter = it.reciterName
-                    }
+                        selectedSurahs = activeRecordings.firstOrNull { recording -> recording.source.id == it.id }?.availableSurahs ?: (1..114).toList()
+                    },
+                    availableSources = availableSources
                 )
                 Spacer(Modifier.height(12.dp))
                 Text(
-                    "تنبيه: التلاوات الحالية تُبث من الإنترنت. لم تُنزّل محليًا بعد، ولذلك لا تعمل دون اتصال.",
+                    "فهرس القراء من MP3Quran. التشغيل الحالي عبر الإنترنت؛ لا توجد تنزيلات محلية بعد، ولذلك لا تعمل التلاوات دون اتصال.",
                     color = ListenMuted, fontSize = 11.sp
                 )
             }
