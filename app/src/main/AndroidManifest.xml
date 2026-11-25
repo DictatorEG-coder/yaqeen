@@ -33,6 +33,21 @@
             </intent-filter>
         </receiver>
         <receiver
+            android:name=".DailyReminderReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.yaqeen.app.DAILY_SALAWAT" />
+                <action android:name="com.yaqeen.app.DAILY_SUNNAH" />
+                <action android:name="com.yaqeen.app.DAILY_HADITH" />
+                <action android:name="com.yaqeen.app.DAILY_NIGHT_PRAYER" />
+                <action android:name="com.yaqeen.app.DAILY_QURAN" />
+                <action android:name="com.yaqeen.app.DAILY_MORNING_ADHKAR" />
+                <action android:name="com.yaqeen.app.DAILY_EVENING_ADHKAR" />
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+        <receiver
             android:name=".SalawatReminderReceiver"
             android:enabled="true"
             android:exported="false">
