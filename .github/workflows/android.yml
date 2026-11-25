@@ -32,6 +32,9 @@ jobs:
       - name: Download and verify offline Arabic tafsir
         run: python3 scripts/fetch_offline_tafsir.py
 
+      - name: Download and build offline Arabic hadith library
+        run: python3 scripts/fetch_offline_hadith.py
+
       - name: Build debug APK
         run: gradle -PQF_PROXY_BASE_URL="${{ vars.QF_PROXY_BASE_URL }}" assembleDebug
 
