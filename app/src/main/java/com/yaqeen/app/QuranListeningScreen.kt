@@ -186,3 +186,14 @@ private fun ListenChoice(
         }
     }
 }
+
+private fun normalizeListenSearch(value: String): String {
+    return Normalizer.normalize(value, Normalizer.Form.NFD)
+        .filterNot {
+            Character.getType(it) == Character.NON_SPACING_MARK.toInt() ||
+                it == 'ـ' || it == 'ٰ'
+        }
+        .replace('أ', 'ا').replace('إ', 'ا').replace('آ', 'ا')
+        .replace('ى', 'ي').replace('ؤ', 'و').replace('ئ', 'ي')
+        .lowercase()
+}
