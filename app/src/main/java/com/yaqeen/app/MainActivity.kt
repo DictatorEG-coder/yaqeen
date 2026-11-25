@@ -482,145 +482,66 @@ private fun SunnahScreen(modifier: Modifier = Modifier) {
 @Composable
 private fun AdhkarScreen(modifier: Modifier = Modifier) {
     val context = LocalContext.current
-    val uriHandler = LocalUriHandler.current
-    val preferences = remember {
-        context.getSharedPreferences("yaqeen_adhkar_counts", android.content.Context.MODE_PRIVATE)
-    }
+    val preferences = remember { context.getSharedPreferences("yaqeen_adhkar_counts", android.content.Context.MODE_PRIVATE) }
     fun todayKey(): String = SimpleDateFormat("yyyyMMdd", Locale.US).format(Date())
-    fun loadCounts(date: String): Map<String, Int> =
-        verifiedAdhkarEntries.associate { entry ->
-            entry.id to preferences.getInt(adhkarStorageKey(date, entry.id), 0)
-        }
-
+    fun loadCounts(date: String): Map<String, Int> = verifiedAdhkarEntries.associate { it.id to preferences.getInt(adhkarStorageKey(date, it.id), 0) }
     var dateKey by remember { mutableStateOf(todayKey()) }
     var counts by remember(dateKey) { mutableStateOf(loadCounts(dateKey)) }
-    var selectedCategory by remember { mutableStateOf("morning") }
-
+    var selectedCategory by remember { mutableStateOf<String?>(null) }
+    var search by remember { mutableStateOf("") }
+    val categories = remember { verifiedAdhkarEntries.map { it.category }.distinct() }
+    val visibleCategories = categories.filter { it.contains(search.trim(), ignoreCase = true) }
+    val entries = verifiedAdhkarEntries.filter { entry ->
+        (selectedCategory == null || entry.category == selectedCategory) &&
+            (search.isBlank() || entry.text.contains(search.trim(), ignoreCase = true) || entry.category.contains(search.trim(), ignoreCase = true))
+    }
     LaunchedEffect(Unit) {
         while (true) {
             delay(60_000)
             val today = todayKey()
-            if (today != dateKey) {
-                preferences.edit().clear().apply()
-                dateKey = today
-                counts = loadCounts(today)
-            }
+            if (today != dateKey) { preferences.edit().clear().apply(); dateKey = today; counts = loadCounts(today) }
         }
     }
-
-    val categories = listOf(
-        "morning" to "الصباح",
-        "evening" to "المساء",
-        "sleep" to "النوم"
-    )
-    val entries = verifiedAdhkarEntries.filter { it.category == selectedCategory }
-
     PageColumn(modifier) {
-        PageHeader("الأذكار", "أذكار مأثورة مع عدّاد يومي ومصادرها")
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            categories.forEach { (key, label) ->
-                TextButton(
-                    onClick = { selectedCategory = key },
-                    colors = ButtonDefaults.textButtonColors(
-                        contentColor = if (selectedCategory == key) Gold else Muted
-                    )
-                ) {
-                    Text(label, fontWeight = if (selectedCategory == key) FontWeight.Bold else FontWeight.Normal)
-                }
+        PageHeader("الأذكار", "حصن المسلم كاملًا · 132 بابًا · 267 ذكرًا ودعاءً")
+        OutlinedTextField(value = search, onValueChange = { search = it }, modifier = Modifier.fillMaxWidth(), label = { Text("ابحث في الأذكار أو أسماء الأبواب") }, singleLine = true)
+        Spacer(Modifier.height(10.dp))
+        if (selectedCategory == null) {
+            SectionHeading("أبواب حصن المسلم")
+            Text("اختر الباب لعرض أذكاره وعدّاد كل ذكر.", color = Muted, fontSize = 11.sp)
+            Spacer(Modifier.height(8.dp))
+            visibleCategories.forEach { category ->
+                val amount = verifiedAdhkarEntries.count { it.category == category }
+                SimpleRow(Icons.Outlined.Bookmarks, category, "$amount من الأذكار", onClick = { selectedCategory = category; search = "" })
             }
-        }
-
-        entries.forEach { entry ->
-            val count = counts[entry.id] ?: 0
-            Card(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-                shape = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(containerColor = Panel)
-            ) {
-                Column(Modifier.padding(16.dp)) {
-                    Text(
-                        entry.text,
-                        color = MainText,
-                        fontSize = 20.sp,
-                        lineHeight = 36.sp,
-                        textAlign = TextAlign.Start
-                    )
-                    entry.note?.let {
-                        Spacer(Modifier.height(6.dp))
-                        Text(it, color = Muted, fontSize = 10.sp)
-                    }
-                    Spacer(Modifier.height(12.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("العدد: $count / ${entry.targetCount}", color = Gold, fontSize = 12.sp)
-                        Text(
-                            if (count >= entry.targetCount) "اكتمل" else "المتبقي: ${entry.targetCount - count}",
-                            color = Muted,
-                            fontSize = 11.sp
-                        )
-                    }
-                    Spacer(Modifier.height(7.dp))
-                    LinearProgressIndicator(
-                        progress = (count.toFloat() / entry.targetCount).coerceIn(0f, 1f),
-                        modifier = Modifier.fillMaxWidth(),
-                        color = Emerald,
-                        trackColor = Muted.copy(alpha = 0.22f)
-                    )
-                    Spacer(Modifier.height(12.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Button(
-                            onClick = {
-                                val next = (counts[entry.id] ?: 0) + 1
-                                counts = counts + (entry.id to next)
-                                preferences.edit()
-                                    .putInt(adhkarStorageKey(dateKey, entry.id), next)
-                                    .apply()
-                            },
-                            enabled = count < entry.targetCount,
-                            colors = ButtonDefaults.buttonColors(containerColor = Emerald),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Text(if (entry.targetCount == 1) "تم الذكر" else "سجّل ذكرًا")
+            if (visibleCategories.isEmpty()) InfoCard("لا توجد أبواب مطابقة", "جرّب كلمة أخرى.")
+        } else {
+            SimpleRow(Icons.Outlined.ArrowBack, "كل الأبواب", "العودة إلى فهرس حصن المسلم", onClick = { selectedCategory = null; search = "" })
+            SectionHeading(selectedCategory!!)
+            Spacer(Modifier.height(8.dp))
+            entries.forEach { entry ->
+                val count = counts[entry.id] ?: 0
+                Card(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp), shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = Panel)) {
+                    Column(Modifier.padding(16.dp)) {
+                        Text(entry.text, color = MainText, fontSize = 19.sp, lineHeight = 34.sp)
+                        Spacer(Modifier.height(8.dp))
+                        Text(entry.sourceLabel, color = Muted, fontSize = 10.sp)
+                        Spacer(Modifier.height(9.dp))
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            Text("العدد: $count / ${entry.targetCount}", color = Gold, fontSize = 12.sp)
+                            Text(if (count >= entry.targetCount) "اكتمل" else "المتبقي: ${entry.targetCount - count}", color = Muted, fontSize = 11.sp)
                         }
-                        OutlinedButton(
-                            onClick = {
-                                counts = counts + (entry.id to 0)
-                                preferences.edit()
-                                    .remove(adhkarStorageKey(dateKey, entry.id))
-                                    .apply()
-                            },
-                            enabled = count > 0,
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Text("إعادة")
+                        LinearProgressIndicator(progress = (count.toFloat() / entry.targetCount).coerceIn(0f, 1f), modifier = Modifier.fillMaxWidth(), color = Emerald, trackColor = Muted.copy(alpha = 0.22f))
+                        Spacer(Modifier.height(10.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(onClick = { val next = (counts[entry.id] ?: 0) + 1; counts = counts + (entry.id to next); preferences.edit().putInt(adhkarStorageKey(dateKey, entry.id), next).apply() }, enabled = count < entry.targetCount, colors = ButtonDefaults.buttonColors(containerColor = Emerald), shape = RoundedCornerShape(12.dp)) { Text(if (entry.targetCount == 1) "تم الذكر" else "سجّل ذكرًا") }
+                            OutlinedButton(onClick = { counts = counts + (entry.id to 0); preferences.edit().remove(adhkarStorageKey(dateKey, entry.id)).apply() }, enabled = count > 0, shape = RoundedCornerShape(12.dp)) { Text("إعادة") }
                         }
                     }
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        "المصدر: ${entry.sourceLabel}",
-                        modifier = Modifier.clickable { uriHandler.openUri(entry.sourceUrl) },
-                        color = Gold,
-                        fontSize = 10.sp
-                    )
                 }
             }
+            if (entries.isEmpty()) InfoCard("لا توجد نتيجة", "لا توجد أذكار مطابقة في هذا الباب.")
         }
-
-        Spacer(Modifier.height(8.dp))
-        InfoCard(
-            title = "مجموعة أولية موثقة",
-            body = "هذه الأذكار أُضيفت بعد مراجعة نصوصها ومراجعها في صحيح البخاري. العدّاد يُحفظ على الجهاز ويُصفّر مع بداية يوم جديد. التذكيرات والإشعارات الاختيارية لم تُفعّل بعد، ولن نضيف نصوصًا قبل التحقق من مصدرها."
-        )
         Spacer(Modifier.height(22.dp))
     }
 }
