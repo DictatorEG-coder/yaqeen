@@ -184,11 +184,13 @@ private fun YaqeenApp(initialSurahNumber: Int = 0, openFridayReminders: Boolean 
                         sharedMediaController = mediaController
                     )
                     8 -> SunnahMahjooraScreen(Modifier.padding(padding))
+                    9 -> TafsirLibraryScreen(Modifier.padding(padding)) { selectedTab = 5 }
                     3 -> AdhkarScreen(Modifier.padding(padding))
                     4 -> RemindersScreen(Modifier.padding(padding))
                     else -> MoreScreen(
                         modifier = Modifier.padding(padding),
-                        onOpenBookmarks = { selectedTab = 1; openBookmarksRequested = true }
+                        onOpenBookmarks = { selectedTab = 1; openBookmarksRequested = true },
+                        onOpenTafsir = { selectedTab = 9 }
                     )
                 }
             }
@@ -683,11 +685,16 @@ private fun AdhkarScreen(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun MoreScreen(modifier: Modifier = Modifier, onOpenBookmarks: () -> Unit) {
+private fun MoreScreen(
+    modifier: Modifier = Modifier,
+    onOpenBookmarks: () -> Unit,
+    onOpenTafsir: () -> Unit
+) {
     val context = LocalContext.current
     PageColumn(modifier) {
         PageHeader("المزيد", "إعدادات يقين ومعلومات التطبيق")
         SimpleRow(Icons.Outlined.Bookmarks, "المحفوظات", "الآيات المحفوظة من المصحف", onClick = onOpenBookmarks)
+        SimpleRow(Icons.Outlined.AutoStories, "التفسير الميسّر", "تصفح تفسير الآيات دون اتصال بالإنترنت", onClick = onOpenTafsir)
         SimpleRow(Icons.Outlined.MenuBook, "حول تطبيق يقين", "الرؤية والمصادر وحقوق المحتوى")
         Spacer(Modifier.height(14.dp))
         Card(
@@ -738,7 +745,7 @@ private fun MoreScreen(modifier: Modifier = Modifier, onOpenBookmarks: () -> Uni
                 Text("دعوة طيبة", color = Gold, fontSize = 15.sp, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(9.dp))
                 Text(
-                    "إن أعجبك تطبيق يقين، فلا تنسَ الدعاء لصاحبه بالتوفيق والنجاح في دراسته، وأن يجعل الله هذا العمل نافعًا وخالصًا لوجهه.",
+                    "لو أعجبك تطبيق يقين، فلا تنسَ الدعاء لصاحبه بالتوفيق في دراسته، وأن يرحم الله والديه، ويجعل هذا العمل نافعًا وخالصًا لوجهه.",
                     color = MainText,
                     fontSize = 13.sp,
                     lineHeight = 24.sp
