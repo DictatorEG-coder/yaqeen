@@ -129,7 +129,7 @@ private fun YaqeenApp(initialSurahNumber: Int = 0, openFridayReminders: Boolean 
                 bottomBar = {
                     Column {
                         mediaController?.let { player ->
-                            QuranMiniPlayer(player) { selectedTab = 7 }
+                            QuranMiniPlayer(player) { selectedTab = 10 }
                         }
                     NavigationBar(
                         modifier = Modifier.navigationBarsPadding(),
@@ -185,6 +185,7 @@ private fun YaqeenApp(initialSurahNumber: Int = 0, openFridayReminders: Boolean 
                     )
                     8 -> SunnahMahjooraScreen(Modifier.padding(padding))
                     9 -> TafsirLibraryScreen(Modifier.padding(padding)) { selectedTab = 5 }
+                    10 -> QuranNowPlayingScreen(Modifier.padding(padding), mediaController) { selectedTab = 6 }
                     3 -> AdhkarScreen(Modifier.padding(padding))
                     4 -> RemindersScreen(Modifier.padding(padding))
                     else -> MoreScreen(
