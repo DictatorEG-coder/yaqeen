@@ -260,7 +260,7 @@ private fun HomeScreen(modifier: Modifier = Modifier, onNavigate: (Int) -> Unit)
                 icon = { Icon(Icons.Outlined.Headphones, null, tint = Gold) },
                 title = "استماع القرآن",
                 subtitle = "القراء والتلاوات",
-                onClick = { onNavigate(1) }
+                onClick = { onNavigate(6) }
             )
             FeatureCard(
                 modifier = Modifier.weight(1f),
@@ -277,13 +277,13 @@ private fun HomeScreen(modifier: Modifier = Modifier, onNavigate: (Int) -> Unit)
                 icon = { Icon(Icons.Outlined.AutoStories, null, tint = Gold) },
                 title = "قراءة واستماع",
                 subtitle = "المتابعة مع التلاوة",
-                onClick = { onNavigate(1) }
+                onClick = { onNavigate(7) }
             )
             FeatureCard(
                 modifier = Modifier.weight(1f),
                 icon = { Icon(Icons.Outlined.LibraryBooks, null, tint = Gold) },
                 title = "الأحاديث",
-                subtitle = "البخاري ومسلم",
+                subtitle = "الكتب الستة",
                 onClick = { onNavigate(2) }
             )
         }
@@ -301,7 +301,7 @@ private fun HomeScreen(modifier: Modifier = Modifier, onNavigate: (Int) -> Unit)
                 icon = { Icon(Icons.Outlined.Spa, null, tint = Gold) },
                 title = "السنن المهجورة",
                 subtitle = "سنن بأدلتها",
-                onClick = { onNavigate(4) }
+                onClick = { onNavigate(8) }
             )
         }
         Spacer(Modifier.height(25.dp))
