@@ -36,8 +36,13 @@ internal object DailyReminderScheduler {
     fun enabled(context: Context, kind: DailyReminderKind): Boolean =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(pref(kind, "enabled"), false)
 
-    fun mode(context: Context, kind: DailyReminderKind): String =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(pref(kind, "mode"), "interval") ?: "interval"
+    fun mode(context: Context, kind: DailyReminderKind): String {
+        val defaultMode = if (kind == DailyReminderKind.MORNING_ADHKAR ||
+            kind == DailyReminderKind.EVENING_ADHKAR || kind == DailyReminderKind.NIGHT_PRAYER
+        ) "daily" else "interval"
+        return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getString(pref(kind, "mode"), defaultMode) ?: defaultMode
+    }
 
     fun hour(context: Context, kind: DailyReminderKind): Int =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getInt(pref(kind, "hour"), defaultHour(kind))
