@@ -2153,3 +2153,28 @@ internal val verifiedAdhkarEntries = listOf(
 
 internal fun adhkarStorageKey(dateKey: String, entryId: String): String =
     "adhkar:$dateKey:$entryId"
+
+
+internal fun normalizeAdhkarSearch(value: String): String =
+    value.lowercase()
+        .replace(Regex("[\\u064B-\\u065F\\u0670\\u0640]"), "")
+        .replace('أ', 'ا')
+        .replace('إ', 'ا')
+        .replace('آ', 'ا')
+        .replace('ى', 'ي')
+        .replace('ؤ', 'و')
+        .replace('ئ', 'ي')
+        .trim()
+
+internal fun filterAdhkarEntries(
+    query: String,
+    category: String? = null
+): List<AdhkarEntry> {
+    val normalized = normalizeAdhkarSearch(query)
+    return verifiedAdhkarEntries.filter { entry ->
+        (category == null || entry.category == category) &&
+            (normalized.isBlank() ||
+                normalizeAdhkarSearch(entry.text).contains(normalized) ||
+                normalizeAdhkarSearch(entry.category).contains(normalized))
+    }
+}
