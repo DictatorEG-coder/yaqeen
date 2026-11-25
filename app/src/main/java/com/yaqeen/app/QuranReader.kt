@@ -159,7 +159,8 @@ fun QuranReaderScreen(
     modifier: Modifier = Modifier,
     showBookmarksInitially: Boolean = false,
     initialSurahNumber: Int = 0,
-    onBookmarksOpened: () -> Unit = {}
+    onBookmarksOpened: () -> Unit = {},
+    audioMode: Boolean = false
 ) {
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
@@ -452,7 +453,7 @@ fun QuranReaderScreen(
                     Icon(Icons.Outlined.BookmarkBorder, contentDescription = "المحفوظات", tint = QuranGold)
                 }
             }
-            QuranAudioPlayerBar(mediaController, selectedAudioSource, { selectedAudioSource = it }, Modifier.padding(bottom = 10.dp))
+            if (audioMode) QuranAudioPlayerBar(mediaController, selectedAudioSource, { selectedAudioSource = it }, Modifier.padding(bottom = 10.dp))
             LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
                 if (current.number != 1 && current.number != 9) {
                     openingBasmala(current.verses.firstOrNull() ?: QuranVerse(0, ""))?.let { basmala ->
@@ -578,7 +579,7 @@ fun QuranReaderScreen(
                 }
             }
         }
-        QuranAudioPlayerBar(mediaController, selectedAudioSource, { selectedAudioSource = it }, Modifier.padding(bottom = 10.dp))
+        if (audioMode) QuranAudioPlayerBar(mediaController, selectedAudioSource, { selectedAudioSource = it }, Modifier.padding(bottom = 10.dp))
         OutlinedTextField(
             value = search,
             onValueChange = { search = it },
