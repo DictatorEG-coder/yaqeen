@@ -29,6 +29,11 @@ jobs:
         with:
           gradle-version: '8.9'
 
+      - name: Prepare stable debug signing key
+        run: |
+          base64 --decode .github/yaqeen-debug.keystore.b64 > .github/yaqeen-debug.keystore
+          keytool -list -keystore .github/yaqeen-debug.keystore -storetype PKCS12 -storepass yaqeenDebugStore2026 -alias yaqeen-debug
+
       - name: Download and verify offline Arabic tafsir
         run: python3 scripts/fetch_offline_tafsir.py
 
@@ -36,10 +41,10 @@ jobs:
         run: python3 scripts/fetch_offline_hadith.py
 
       - name: Build debug APK
-        run: gradle -PQF_PROXY_BASE_URL="${{ vars.QF_PROXY_BASE_URL }}" assembleDebug
+        run: gradle -PYAQEEN_VERSION_CODE=${{ github.run_number }} -PQF_PROXY_BASE_URL="${{ vars.QF_PROXY_BASE_URL }}" assembleDebug
 
       - name: Run Quran integrity unit tests
-        run: gradle -PQF_PROXY_BASE_URL="${{ vars.QF_PROXY_BASE_URL }}" testDebugUnitTest
+        run: gradle -PYAQEEN_VERSION_CODE=${{ github.run_number }} -PQF_PROXY_BASE_URL="${{ vars.QF_PROXY_BASE_URL }}" testDebugUnitTest
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
