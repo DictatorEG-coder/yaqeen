@@ -18,6 +18,7 @@ internal data class OfflineHadithBook(
 )
 
 internal data class OfflineHadith(
+    val id: Long,
     val collectionId: String,
     val bookNumber: String,
     val chapterNumber: String?,
@@ -154,7 +155,7 @@ internal object OfflineHadithRepository {
         val pageArgs = args + listOf(limit.toString(), offset.toString())
         val rows = db.rawQuery(
             """
-            SELECT collection_id, book_number, chapter_number, hadith_number, reference,
+            SELECT id, collection_id, book_number, chapter_number, hadith_number, reference,
                    chapter_name_ar, text_ar, narrator, grade_ar, source_reference, url_source
             FROM hadiths
             WHERE $where
@@ -166,17 +167,18 @@ internal object OfflineHadithRepository {
             buildList {
                 while (cursor.moveToNext()) add(
                     OfflineHadith(
-                        collectionId = cursor.getString(0),
-                        bookNumber = cursor.getString(1),
-                        chapterNumber = cursor.getString(2),
-                        number = cursor.getString(3),
-                        reference = cursor.getString(4),
-                        chapterNameArabic = cursor.getString(5),
-                        textArabic = cursor.getString(6),
-                        narrator = cursor.getString(7),
-                        gradeArabic = cursor.getString(8),
-                        sourceReference = cursor.getString(9),
-                        sourceUrl = cursor.getString(10)
+                        id = cursor.getLong(0),
+                        collectionId = cursor.getString(1),
+                        bookNumber = cursor.getString(2),
+                        chapterNumber = cursor.getString(3),
+                        number = cursor.getString(4),
+                        reference = cursor.getString(5),
+                        chapterNameArabic = cursor.getString(6),
+                        textArabic = cursor.getString(7),
+                        narrator = cursor.getString(8),
+                        gradeArabic = cursor.getString(9),
+                        sourceReference = cursor.getString(10),
+                        sourceUrl = cursor.getString(11)
                     )
                 )
             }
