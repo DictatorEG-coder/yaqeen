@@ -1,5 +1,7 @@
 package com.yaqeen.app
 
+import android.content.Context
+import androidx.core.text.HtmlCompat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -21,6 +23,36 @@ internal data class QFTafsirEntry(
     val authorName: String?,
     val text: String
 )
+
+internal fun parseOfflineMuyassarTafsir(json: String, verseKey: String): QFTafsirEntry? {
+    if (!verseKey.matches(Regex("^\\\\d{1,3}:\\\\d{1,3}$"))) return null
+    val parts = verseKey.split(":")
+    val verse = JSONObject(json).optJSONObject("verses")
+        ?.optJSONObject(parts[0])?.optJSONObject(parts[1]) ?: return null
+    val rawText = verse.optString("text").takeIf { it.isNotBlank() && it != "null" } ?: return null
+    val rawFootnotes = verse.optString("footnotes").takeIf { it.isNotBlank() && it != "null" }
+    val renderedText = HtmlCompat.fromHtml(rawText, HtmlCompat.FROM_HTML_MODE_LEGACY).toString().trim()
+    val renderedFootnotes = rawFootnotes?.let {
+        HtmlCompat.fromHtml(it, HtmlCompat.FROM_HTML_MODE_LEGACY).toString().trim()
+    }
+    val completeText = listOfNotNull(renderedText, renderedFootnotes?.takeIf { it.isNotBlank() })
+        .joinToString("\\n\\n")
+    return QFTafsirEntry(verseKey, "التفسير الميسر", "QuranEnc.com · الإصدار 1.0.0", completeText)
+}
+
+internal object OfflineTafsirRepository {
+    @Volatile private var cachedJson: String? = null
+
+    fun find(context: Context, verseKey: String): QFTafsirEntry? {
+        val json = cachedJson ?: synchronized(this) {
+            cachedJson ?: runCatching {
+                java.util.zip.GZIPInputStream(context.assets.open("arabic_moyassar.json.gz"))
+                    .bufferedReader(Charsets.UTF_8).use { it.readText() }
+            }.getOrNull()?.also { cachedJson = it }
+        } ?: return null
+        return runCatching { parseOfflineMuyassarTafsir(json, verseKey) }.getOrNull()
+    }
+}
 
 internal data class QFChapterReciter(
     val id: Int,
