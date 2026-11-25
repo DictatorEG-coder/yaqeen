@@ -568,27 +568,29 @@ private fun HadithLibraryScreen(modifier: Modifier = Modifier) {
             if (hadiths.size < total) item {
                 Button(
                     onClick = {
-                        val collection = selectedCollection ?: return@Button
-                        val book = selectedBookNumber ?: return@Button
-                        scope.launch {
-                            loadingMore = true
-                            try {
-                                val next = withContext(Dispatchers.IO) {
-                                    OfflineHadithRepository.search(
-                                        context.applicationContext,
-                                        collection.id,
-                                        book.takeIf { it.isNotEmpty() },
-                                        search,
-                                        limit = 100,
-                                        offset = hadiths.size
-                                    )
+                        val collection = selectedCollection
+                        val book = selectedBookNumber
+                        if (collection != null && book != null) {
+                            scope.launch {
+                                loadingMore = true
+                                try {
+                                    val next = withContext(Dispatchers.IO) {
+                                        OfflineHadithRepository.search(
+                                            context.applicationContext,
+                                            collection.id,
+                                            book.takeIf { it.isNotEmpty() },
+                                            search,
+                                            limit = 100,
+                                            offset = hadiths.size
+                                        )
+                                    }
+                                    hadiths = hadiths + next.items
+                                    total = next.total
+                                } catch (failure: Exception) {
+                                    error = failure.message ?: "تعذّر تحميل المزيد."
+                                } finally {
+                                    loadingMore = false
                                 }
-                                hadiths = hadiths + next.items
-                                total = next.total
-                            } catch (failure: Exception) {
-                                error = failure.message ?: "تعذّر تحميل المزيد."
-                            } finally {
-                                loadingMore = false
                             }
                         }
                     },
