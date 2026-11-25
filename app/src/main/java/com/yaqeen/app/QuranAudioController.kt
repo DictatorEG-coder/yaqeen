@@ -106,12 +106,14 @@ class QuranPlaybackService : MediaSessionService() {
         internal fun enqueueDownload(source: QuranAudioSource, surahNumber: Int): Boolean {
             if (surahNumber !in 1..114) return false
             val manager = activeInstance?.downloadManager ?: return false
-            val request = DownloadRequest.Builder(
-                "quran-${source.id}-${surahNumber}",
-                Uri.parse(quranAudioUrl(source.id, surahNumber))
-            ).setMimeType(MimeTypes.AUDIO_MPEG).build()
-            manager.addDownload(request)
-            return true
+            return runCatching {
+                val request = DownloadRequest.Builder(
+                    "quran-${source.id}-${surahNumber}",
+                    Uri.parse(quranAudioUrl(source, surahNumber))
+                ).setMimeType(MimeTypes.AUDIO_MPEG).build()
+                manager.addDownload(request)
+                true
+            }.getOrDefault(false)
         }
 
         fun pauseDownloads(): Boolean {
@@ -324,11 +326,17 @@ internal val quranAudioSources = listOf(
     )
 )
 
-internal fun quranAudioUrl(sourceId: String, surahNumber: Int): String {
+internal fun quranAudioUrl(source: QuranAudioSource, surahNumber: Int): String {
     require(surahNumber in 1..114) { "Surah number must be between 1 and 114" }
+    val base = source.baseUrl.trim().let { if (it.endsWith("/")) it else "$it/" }
+    require(base.startsWith("https://", ignoreCase = true)) { "Audio source must use HTTPS" }
+    return base + String.format(Locale.US, "%03d.mp3", surahNumber)
+}
+
+internal fun quranAudioUrl(sourceId: String, surahNumber: Int): String {
     val source = quranAudioSources.firstOrNull { it.id == sourceId }
         ?: throw IllegalArgumentException("Unknown Quran audio source: $sourceId")
-    return source.baseUrl + String.format(Locale.US, "%03d.mp3", surahNumber)
+    return quranAudioUrl(source, surahNumber)
 }
 
 internal fun surahNumberFromMediaId(mediaId: String?): Int? =
