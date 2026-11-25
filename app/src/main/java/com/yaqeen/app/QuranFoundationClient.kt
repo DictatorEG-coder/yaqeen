@@ -1,5 +1,6 @@
 package com.yaqeen.app
 
+import android.content.Context
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -21,6 +22,35 @@ internal data class QFTafsirEntry(
     val authorName: String?,
     val text: String
 )
+
+internal fun parseOfflineMuyassarTafsir(json: String, verseKey: String): QFTafsirEntry? =
+    runCatching { parseOfflineMuyassarTafsir(JSONObject(json), verseKey) }.getOrNull()
+
+private fun parseOfflineMuyassarTafsir(root: JSONObject, verseKey: String): QFTafsirEntry? {
+    if (!verseKey.matches(Regex("^\\d{1,3}:\\d{1,3}$"))) return null
+    val parts = verseKey.split(":")
+    val verse = root.optJSONObject("verses")
+        ?.optJSONObject(parts[0])?.optJSONObject(parts[1]) ?: return null
+    val rawText = verse.optString("text").takeIf { it.isNotBlank() && it != "null" } ?: return null
+    val rawFootnotes = verse.optString("footnotes").takeIf { it.isNotBlank() && it != "null" }
+    val completeText = listOfNotNull(rawText, rawFootnotes).joinToString("\n\n")
+    return QFTafsirEntry(verseKey, "التفسير الميسر", "QuranEnc.com · الإصدار 1.0.0", completeText)
+}
+
+internal object OfflineTafsirRepository {
+    @Volatile private var cachedRoot: JSONObject? = null
+
+    fun find(context: Context, verseKey: String): QFTafsirEntry? {
+        val root = cachedRoot ?: synchronized(this) {
+            cachedRoot ?: runCatching {
+                val json = java.util.zip.GZIPInputStream(context.assets.open("arabic_moyassar.json.gz"))
+                    .bufferedReader(Charsets.UTF_8).use { it.readText() }
+                JSONObject(json)
+            }.getOrNull()?.also { cachedRoot = it }
+        } ?: return null
+        return runCatching { parseOfflineMuyassarTafsir(root, verseKey) }.getOrNull()
+    }
+}
 
 internal data class QFChapterReciter(
     val id: Int,

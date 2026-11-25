@@ -1,8 +1,10 @@
 package com.yaqeen.app
 
 import android.content.ComponentName
+import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,6 +14,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Pause
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.RepeatOne
+import androidx.compose.material.icons.outlined.Replay10
+import androidx.compose.material.icons.outlined.Forward10
 import androidx.compose.material.icons.outlined.SkipNext
 import androidx.compose.material.icons.outlined.SkipPrevious
 import androidx.compose.material3.Card
@@ -21,6 +25,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -42,7 +47,24 @@ import androidx.core.content.ContextCompat
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
+import androidx.media3.common.MimeTypes
 import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.database.StandaloneDatabaseProvider
+import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.datasource.cache.CacheDataSource
+import androidx.media3.datasource.cache.NoOpCacheEvictor
+import androidx.media3.datasource.cache.SimpleCache
+import androidx.media3.exoplayer.offline.Download
+import androidx.media3.exoplayer.offline.DownloadManager
+import androidx.media3.exoplayer.offline.DownloadRequest
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import java.io.File
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaController
@@ -63,9 +85,12 @@ internal fun sleepTimerDelayMs(minutes: Int): Long {
     return minutes.toLong() * 60_000L
 }
 
+@OptIn(UnstableApi::class)
 class QuranPlaybackService : MediaSessionService() {
     companion object {
         @Volatile private var activeInstance: QuranPlaybackService? = null
+        private val mutableDownloads = MutableStateFlow<List<Download>>(emptyList())
+        val downloads: StateFlow<List<Download>> = mutableDownloads.asStateFlow()
 
         fun scheduleSleepTimer(minutes: Int): Boolean {
             if (minutes !in 1..180) return false
@@ -77,21 +102,120 @@ class QuranPlaybackService : MediaSessionService() {
         fun cancelSleepTimer() {
             activeInstance?.cancelTimer()
         }
+
+        internal fun enqueueDownload(source: QuranAudioSource, surahNumber: Int): Boolean {
+            if (surahNumber !in 1..114) return false
+            val manager = activeInstance?.downloadManager ?: return false
+            return runCatching {
+                val request = DownloadRequest.Builder(
+                    "quran-${source.id}-${surahNumber}",
+                    Uri.parse(quranAudioUrl(source, surahNumber))
+                ).setMimeType(MimeTypes.AUDIO_MPEG).build()
+                manager.addDownload(request)
+                true
+            }.getOrDefault(false)
+        }
+
+        fun pauseDownloads(): Boolean {
+            val manager = activeInstance?.downloadManager ?: return false
+            manager.pauseDownloads()
+            return true
+        }
+
+        fun resumeDownloads(): Boolean {
+            val manager = activeInstance?.downloadManager ?: return false
+            manager.resumeDownloads()
+            return true
+        }
+
+        fun removeDownload(downloadId: String): Boolean {
+            val manager = activeInstance?.downloadManager ?: return false
+            manager.removeDownload(downloadId)
+            return true
+        }
     }
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private var sleepTask: Runnable? = null
     private var mediaSession: MediaSession? = null
+    private var downloadManager: DownloadManager? = null
+    private var audioCache: SimpleCache? = null
+    private var downloadListener: DownloadManager.Listener? = null
+    private var downloadExecutor: ExecutorService? = null
 
     override fun onCreate() {
         super.onCreate()
         activeInstance = this
-        val player = ExoPlayer.Builder(this).build()
+
+        val databaseProvider = StandaloneDatabaseProvider(this)
+        val cache = SimpleCache(
+            File(cacheDir, "yaqeen_quran_audio"),
+            NoOpCacheEvictor(),
+            databaseProvider
+        )
+        audioCache = cache
+        val upstreamFactory = DefaultHttpDataSource.Factory()
+            .setUserAgent("YaqeenAndroid/0.2.0")
+            .setConnectTimeoutMs(15_000)
+            .setReadTimeoutMs(30_000)
+
+        val executor = Executors.newFixedThreadPool(2)
+        downloadExecutor = executor
+        val manager = DownloadManager(
+            this,
+            databaseProvider,
+            cache,
+            upstreamFactory,
+            executor
+        )
+        manager.maxParallelDownloads = 2
+        downloadManager = manager
+        val listener = object : DownloadManager.Listener {
+            override fun onInitialized(downloadManager: DownloadManager) {
+                refreshDownloads(downloadManager)
+            }
+
+            override fun onDownloadChanged(
+                downloadManager: DownloadManager,
+                download: Download,
+                finalException: Exception?
+            ) {
+                refreshDownloads(downloadManager)
+            }
+
+            override fun onDownloadRemoved(downloadManager: DownloadManager, download: Download) {
+                refreshDownloads(downloadManager)
+            }
+        }
+        downloadListener = listener
+        manager.addListener(listener)
+        manager.resumeDownloads()
+
+        val cacheDataSourceFactory = CacheDataSource.Factory()
+            .setCache(cache)
+            .setUpstreamDataSourceFactory(upstreamFactory)
+        val player = ExoPlayer.Builder(this)
+            .setMediaSourceFactory(DefaultMediaSourceFactory(cacheDataSourceFactory))
+            .build()
         player.setAudioAttributes(AudioAttributes.DEFAULT, true)
         player.setHandleAudioBecomingNoisy(true)
         mediaSession = MediaSession.Builder(this, player)
             .setId("yaqeen-quran-player")
             .build()
+    }
+
+    @OptIn(UnstableApi::class)
+    private fun refreshDownloads(manager: DownloadManager) {
+        runCatching {
+            val cursor = manager.downloadIndex.getDownloads()
+            val values = mutableListOf<Download>()
+            try {
+                while (cursor.moveToNext()) values += cursor.download
+            } finally {
+                cursor.close()
+            }
+            mutableDownloads.value = values.sortedBy { it.request.id }
+        }
     }
 
     private fun scheduleTimer(minutes: Int) {
@@ -114,11 +238,18 @@ class QuranPlaybackService : MediaSessionService() {
     override fun onDestroy() {
         cancelTimer()
         if (activeInstance === this) activeInstance = null
+        downloadListener?.let { listener -> downloadManager?.removeListener(listener) }
+        downloadManager?.release()
+        downloadManager = null
+        downloadExecutor?.shutdown()
+        downloadExecutor = null
         mediaSession?.let { session ->
             session.player.release()
             session.release()
         }
         mediaSession = null
+        audioCache?.release()
+        audioCache = null
         super.onDestroy()
     }
 }
@@ -195,11 +326,17 @@ internal val quranAudioSources = listOf(
     )
 )
 
-internal fun quranAudioUrl(sourceId: String, surahNumber: Int): String {
+internal fun quranAudioUrl(source: QuranAudioSource, surahNumber: Int): String {
     require(surahNumber in 1..114) { "Surah number must be between 1 and 114" }
+    val base = source.baseUrl.trim().let { if (it.endsWith("/")) it else "$it/" }
+    require(base.startsWith("https://", ignoreCase = true)) { "Audio source must use HTTPS" }
+    return base + String.format(Locale.US, "%03d.mp3", surahNumber)
+}
+
+internal fun quranAudioUrl(sourceId: String, surahNumber: Int): String {
     val source = quranAudioSources.firstOrNull { it.id == sourceId }
         ?: throw IllegalArgumentException("Unknown Quran audio source: $sourceId")
-    return source.baseUrl + String.format(Locale.US, "%03d.mp3", surahNumber)
+    return quranAudioUrl(source, surahNumber)
 }
 
 internal fun surahNumberFromMediaId(mediaId: String?): Int? =
@@ -304,22 +441,25 @@ internal fun playQuranFoundationPlaylist(
     controller.play()
 }
 
-internal fun playQuranRecitation(controller: MediaController, startSurah: Int, source: QuranAudioSource) {
+internal fun playQuranRecitation(controller: MediaController, startSurah: Int, source: QuranAudioSource, availableSurahs: List<Int> = (1..114).toList()) {
     require(startSurah in 1..114) { "Surah number must be between 1 and 114" }
-    val playlist = surahNames.mapIndexed { index, name ->
-        val number = index + 1
+    val orderedSurahs = availableSurahs.filter { it in 1..114 }.distinct().sorted()
+    require(orderedSurahs.isNotEmpty()) { "No surahs are available for this recording" }
+    val playlist = orderedSurahs.map { number ->
+        val name = surahNames[number - 1]
         MediaItem.Builder()
             .setMediaId("${source.id}-$number")
-            .setUri(quranAudioUrl(source.id, number))
+            .setUri(source.baseUrl + String.format(Locale.US, "%03d.mp3", number))
             .setMediaMetadata(
                 MediaMetadata.Builder()
                     .setTitle(name)
-                    .setArtist("${source.reciterName} · ${source.style} · Quran Foundation / QuranicAudio")
+                    .setArtist("${source.reciterName} · ${source.style} · MP3Quran")
                     .build()
             )
             .build()
     }
-    controller.setMediaItems(playlist, startSurah - 1, 0L)
+    val startIndex = orderedSurahs.indexOf(startSurah).coerceAtLeast(0)
+    controller.setMediaItems(playlist, startIndex, 0L)
     controller.prepare()
     controller.play()
 }
@@ -329,7 +469,9 @@ internal fun QuranAudioPlayerBar(
     controller: MediaController?,
     selectedSource: QuranAudioSource,
     onSourceSelected: (QuranAudioSource) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    availableSources: List<QuranAudioSource> = quranAudioSources,
+    availableSurahMap: Map<String, List<Int>> = emptyMap()
 ) {
     if (controller == null) return
 
@@ -444,14 +586,14 @@ internal fun QuranAudioPlayerBar(
                         expanded = sourceMenuExpanded,
                         onDismissRequest = { sourceMenuExpanded = false }
                     ) {
-                        quranAudioSources.forEach { source ->
+                        availableSources.forEach { source ->
                             DropdownMenuItem(
                                 text = { Text("${source.reciterName} · ${source.style}") },
                                 onClick = {
                                     onSourceSelected(source)
                                     if (controller.mediaItemCount > 0) {
                                         val currentSurah = surahNumberFromMediaId(controller.currentMediaItem?.mediaId) ?: 1
-                                        playQuranRecitation(controller, currentSurah, source)
+                                        playQuranRecitation(controller, currentSurah, source, availableSurahMap[source.id] ?: (1..114).toList())
                                     }
                                     sourceMenuExpanded = false
                                 }
@@ -488,12 +630,37 @@ internal fun QuranAudioPlayerBar(
                     }
                 }
             }
-            LinearProgressIndicator(
-                progress = progress,
-                modifier = Modifier.fillMaxWidth(),
-                color = AudioGold,
-                trackColor = AudioMuted.copy(alpha = 0.25f)
+            Slider(
+                value = progress,
+                onValueChange = { fraction ->
+                    if (duration > 0L) position = (fraction * duration).toLong()
+                },
+                onValueChangeFinished = { controller.seekTo(position) },
+                enabled = duration > 0L,
+                modifier = Modifier.fillMaxWidth()
             )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = { controller.seekTo((controller.currentPosition - 10_000L).coerceAtLeast(0L)) }) {
+                    Icon(Icons.Outlined.Replay10, contentDescription = "رجوع عشر ثوانٍ", tint = AudioGold)
+                }
+                Text(
+                    "${position / 60_000L}:%02d".format((position / 1_000L) % 60L),
+                    color = AudioMuted,
+                    fontSize = 10.sp
+                )
+                Text(
+                    "${duration / 60_000L}:%02d".format((duration / 1_000L) % 60L),
+                    color = AudioMuted,
+                    fontSize = 10.sp
+                )
+                IconButton(onClick = { controller.seekTo((controller.currentPosition + 10_000L).coerceAtMost(duration)) }) {
+                    Icon(Icons.Outlined.Forward10, contentDescription = "تقديم عشر ثوانٍ", tint = AudioGold)
+                }
+            }
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -566,6 +733,113 @@ internal fun QuranAudioPlayerBar(
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+
+@Composable
+internal fun QuranMiniPlayer(
+    controller: MediaController,
+    onOpenPlayer: () -> Unit
+) {
+    var hasTrack by remember(controller) { mutableStateOf(controller.currentMediaItem != null) }
+    var playing by remember(controller) { mutableStateOf(controller.isPlaying) }
+    var title by remember(controller) {
+        mutableStateOf(controller.currentMediaItem?.mediaMetadata?.title?.toString().orEmpty())
+    }
+    var artist by remember(controller) {
+        mutableStateOf(controller.currentMediaItem?.mediaMetadata?.artist?.toString().orEmpty())
+    }
+    var position by remember(controller) { mutableStateOf(controller.currentPosition.coerceAtLeast(0L)) }
+    var duration by remember(controller) { mutableStateOf(controller.duration.coerceAtLeast(0L)) }
+
+    DisposableEffect(controller) {
+        val listener = object : Player.Listener {
+            override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                hasTrack = mediaItem != null
+                title = mediaItem?.mediaMetadata?.title?.toString().orEmpty()
+                artist = mediaItem?.mediaMetadata?.artist?.toString().orEmpty()
+                position = 0L
+                duration = controller.duration.coerceAtLeast(0L)
+            }
+
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                playing = isPlaying
+            }
+
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                duration = controller.duration.coerceAtLeast(0L)
+                hasTrack = controller.currentMediaItem != null
+            }
+        }
+        controller.addListener(listener)
+        onDispose { controller.removeListener(listener) }
+    }
+
+    LaunchedEffect(controller, hasTrack) {
+        while (isActive && hasTrack) {
+            position = controller.currentPosition.coerceAtLeast(0L)
+            duration = controller.duration.coerceAtLeast(0L)
+            playing = controller.isPlaying
+            delay(700)
+        }
+    }
+
+    if (hasTrack) {
+        val progress = if (duration > 0L) (position.toFloat() / duration).coerceIn(0f, 1f) else 0f
+        Card(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 4.dp)
+                .clickable(onClick = onOpenPlayer),
+            colors = CardDefaults.cardColors(containerColor = AudioPanel),
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp)
+        ) {
+            Column(Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            title.ifBlank { "تلاوة قرآنية" },
+                            color = AudioWhite,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            artist.ifBlank { "يَقِين" },
+                            color = AudioMuted,
+                            fontSize = 10.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    IconButton(onClick = { controller.seekToPreviousMediaItem() }) {
+                        Icon(Icons.Outlined.SkipPrevious, contentDescription = "السورة السابقة", tint = AudioGold)
+                    }
+                    IconButton(onClick = { if (controller.isPlaying) controller.pause() else controller.play() }) {
+                        Icon(
+                            if (playing) Icons.Outlined.Pause else Icons.Outlined.PlayArrow,
+                            contentDescription = if (playing) "إيقاف مؤقت" else "تشغيل",
+                            tint = AudioGold
+                        )
+                    }
+                    IconButton(onClick = { controller.seekToNextMediaItem() }) {
+                        Icon(Icons.Outlined.SkipNext, contentDescription = "السورة التالية", tint = AudioGold)
+                    }
+                }
+                LinearProgressIndicator(
+                    progress = progress,
+                    modifier = Modifier.fillMaxWidth(),
+                    color = AudioGold,
+                    trackColor = AudioMuted.copy(alpha = 0.22f)
+                )
             }
         }
     }

@@ -55,6 +55,24 @@ class QuranAudioSourceTest {
         assertEquals(9, quranAudioSources.size)
     }
 
+    @Test
+    fun buildsDownloadUrlsForDynamicMp3QuranCatalogSources() {
+        val hafs = QuranAudioSource(
+            "mp3quran_41_7",
+            "قارئ تجريبي",
+            "حفص عن عاصم",
+            "https://server.example/audio"
+        )
+        assertEquals(
+            "https://server.example/audio/001.mp3",
+            quranAudioUrl(hafs, 1)
+        )
+        assertEquals(
+            "https://server.example/audio/114.mp3",
+            quranAudioUrl(hafs, 114)
+        )
+    }
+
     @Test(expected = IllegalArgumentException::class)
     fun rejectsUnknownAudioSource() {
         quranAudioUrl("unknown", 47)

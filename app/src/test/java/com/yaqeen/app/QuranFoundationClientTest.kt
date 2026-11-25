@@ -153,4 +153,21 @@ class QuranFoundationClientTest {
         assertFalse(QuranFoundationClient("").isConfigured)
         assertFalse(QuranFoundationClient("http://insecure.example").isConfigured)
     }
+
+    @Test
+    fun offlineMuyassarParserReadsVerseAndFootnotes() {
+        val json = """{"verses":{"1":{"1":{"text":"بسم الله","footnotes":"هامش موثق"}}}}"""
+        val result = parseOfflineMuyassarTafsir(json, "1:1")
+        assertEquals("1:1", result?.verseKey)
+        assertEquals("التفسير الميسر", result?.resourceName)
+        assertTrue(result?.text?.contains("بسم الله") == true)
+        assertTrue(result?.text?.contains("هامش موثق") == true)
+    }
+
+    @Test
+    fun offlineMuyassarParserRejectsMissingOrInvalidVerses() {
+        val json = """{"verses":{"1":{"1":{"text":"بسم الله"}}}}"""
+        assertEquals(null, parseOfflineMuyassarTafsir(json, "1:2"))
+        assertEquals(null, parseOfflineMuyassarTafsir(json, "1/x"))
+    }
 }

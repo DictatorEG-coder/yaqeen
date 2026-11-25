@@ -1,5 +1,6 @@
 package com.yaqeen.app
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -38,6 +39,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -96,10 +98,20 @@ internal val surahNames = listOf(
     "النصر", "المسد", "الإخلاص", "الفلق", "الناس"
 )
 
+@Volatile
+private var cachedQuranData: List<QuranSurah>? = null
+
+private val quranCacheLock = Any()
+
 internal fun loadQuran(context: android.content.Context): List<QuranSurah> {
-    val rawText = context.assets.open("quran-uthmani.txt")
-        .bufferedReader(Charsets.UTF_8).use { it.readText() }
-    return parseQuran(rawText)
+    cachedQuranData?.let { return it }
+    return synchronized(quranCacheLock) {
+        cachedQuranData ?: run {
+            val rawText = context.assets.open("quran-uthmani.txt")
+                .bufferedReader(Charsets.UTF_8).use { it.readText() }
+            parseQuran(rawText).also { cachedQuranData = it }
+        }
+    }
 }
 
 internal fun parseQuran(rawText: String): List<QuranSurah> {
@@ -155,15 +167,18 @@ private fun normalizeArabic(value: String): String {
 }
 
 @Composable
+@OptIn(ExperimentalFoundationApi::class)
 fun QuranReaderScreen(
     modifier: Modifier = Modifier,
     showBookmarksInitially: Boolean = false,
     initialSurahNumber: Int = 0,
-    onBookmarksOpened: () -> Unit = {}
+    onBookmarksOpened: () -> Unit = {},
+    audioMode: Boolean = false,
+    sharedMediaController: androidx.media3.session.MediaController? = null
 ) {
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
-    val mediaController = rememberQuranMediaController()
+    val mediaController = sharedMediaController ?: rememberQuranMediaController()
     var surahs by remember { mutableStateOf<List<QuranSurah>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var loadError by remember { mutableStateOf(false) }
@@ -236,27 +251,37 @@ fun QuranReaderScreen(
         tafsirError = null
         tafsirLoading = true
         try {
-            val client = QuranFoundationClient()
-            check(client.isConfigured) {
-                "مصدر التفسير غير مربوط بعد. يلزم إعداد خادم Quran Foundation ومنحه صلاحية tafsirs."
+            val offline = withContext(Dispatchers.IO) {
+                OfflineTafsirRepository.find(context.applicationContext, key)
             }
-            val resources = client.fetchArabicTafsirResources()
-            val resource = resources.firstOrNull()
-                ?: throw IllegalStateException("لا تتوفر حاليًا موارد تفسير عربية من المصدر.")
-            tafsirText = client.fetchTafsirForVerse(resource.id, key)
+            if (offline != null) {
+                tafsirText = offline
+            } else {
+                val client = QuranFoundationClient()
+                check(client.isConfigured) {
+                    "التفسير الميسر غير متاح محليًا، ومصدر التفسير عبر الإنترنت غير مربوط."
+                }
+                val resources = client.fetchArabicTafsirResources()
+                val resource = resources.firstOrNull()
+                    ?: throw IllegalStateException("لا تتوفر حاليًا موارد تفسير عربية من المصدر.")
+                tafsirText = client.fetchTafsirForVerse(resource.id, key)
+            }
         } catch (error: Exception) {
-            tafsirError = error.message ?: "تعذّر تحميل التفسير من المصدر."
+            tafsirError = error.message ?: "تعذّر تحميل التفسير."
         } finally {
             tafsirLoading = false
         }
     }
 
     val normalizedQuery = remember(search) { normalizeArabic(search.trim()) }
-    val verseResults = remember(normalizedQuery, surahs) {
+    val normalizedVerseIndex = remember(surahs) {
+        surahs.map { surah -> surah to surah.verses.map { verse -> verse to normalizeArabic(verse.text) } }
+    }
+    val verseResults = remember(normalizedQuery, normalizedVerseIndex) {
         if (normalizedQuery.length < 2) emptyList()
-        else surahs.flatMap { surah ->
-            surah.verses.filter { normalizeArabic(it.text).contains(normalizedQuery) }
-                .map { surah to it }
+        else normalizedVerseIndex.flatMap { (surah, verses) ->
+            verses.filter { (_, normalizedText) -> normalizedText.contains(normalizedQuery) }
+                .map { (verse, _) -> surah to verse }
         }.take(100)
     }
     val matchingSurahs = remember(normalizedQuery, surahs) {
@@ -327,7 +352,7 @@ fun QuranReaderScreen(
                                 lineHeight = 25.sp
                             )
                             Spacer(Modifier.height(8.dp))
-                            Text("المصدر: Quran Foundation · التفسير المنقول كما ورد من المصدر", color = QuranMuted, fontSize = 10.sp)
+                            Text("النص والهوامش كما وردت من المصدر المذكور أعلاه.", color = QuranMuted, fontSize = 10.sp)
                         }
                     }
                 }
@@ -452,7 +477,7 @@ fun QuranReaderScreen(
                     Icon(Icons.Outlined.BookmarkBorder, contentDescription = "المحفوظات", tint = QuranGold)
                 }
             }
-            QuranAudioPlayerBar(mediaController, selectedAudioSource, { selectedAudioSource = it }, Modifier.padding(bottom = 10.dp))
+            if (audioMode) QuranAudioPlayerBar(mediaController, selectedAudioSource, { selectedAudioSource = it }, Modifier.padding(bottom = 10.dp))
             LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
                 if (current.number != 1 && current.number != 9) {
                     openingBasmala(current.verses.firstOrNull() ?: QuranVerse(0, ""))?.let { basmala ->
@@ -540,73 +565,88 @@ fun QuranReaderScreen(
 
     Column(modifier = modifier.fillMaxSize().background(QuranInk).padding(horizontal = 16.dp)) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(top = 22.dp),
+            modifier = Modifier.fillMaxWidth().padding(top = 14.dp, bottom = 2.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text("القرآن الكريم", color = QuranGold, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+            Column {
+                Text("القرآن الكريم", color = QuranGold, fontSize = 25.sp, fontWeight = FontWeight.Bold)
+                Text("مصحف كامل · ١١٤ سورة · ٦٢٣٦ آية", color = QuranMuted, fontSize = 11.sp)
+            }
             IconButton(onClick = { showBookmarks = true }) {
                 Icon(Icons.Outlined.BookmarkBorder, contentDescription = "المحفوظات", tint = QuranGold)
             }
         }
-        Text("مصحف كامل · ١١٤ سورة · ٦٢٣٦ آية", modifier = Modifier.padding(top = 5.dp, bottom = 8.dp), color = QuranMuted, fontSize = 12.sp)
-        Card(
-            modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
-            colors = CardDefaults.cardColors(containerColor = QuranPanel),
-            shape = RoundedCornerShape(15.dp)
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            state = rememberLazyListState()
         ) {
-            Column(Modifier.padding(13.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+            item(key = "khatma_progress") {
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 8.dp),
+                    colors = CardDefaults.cardColors(containerColor = QuranPanel),
+                    shape = RoundedCornerShape(15.dp)
                 ) {
-                    Text("متابعة الختمة · اختيارية", color = QuranGold, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                    Text("${completedVerseKeys.size} / 6236 آية", color = QuranMuted, fontSize = 11.sp)
-                }
-                Spacer(Modifier.height(8.dp))
-                LinearProgressIndicator(
-                    progress = (completedVerseKeys.size / 6236f).coerceIn(0f, 1f),
-                    modifier = Modifier.fillMaxWidth(),
-                    color = QuranEmerald,
-                    trackColor = QuranMuted.copy(alpha = 0.2f)
-                )
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    TextButton(onClick = { showResetKhatmaDialog = true }) {
-                        Text("إعادة ضبط", color = QuranMuted, fontSize = 11.sp)
+                    Column(Modifier.padding(horizontal = 13.dp, vertical = 10.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("متابعة الختمة · اختيارية", color = QuranGold, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                            Text("${completedVerseKeys.size} / 6236 آية", color = QuranMuted, fontSize = 11.sp)
+                        }
+                        Spacer(Modifier.height(7.dp))
+                        LinearProgressIndicator(
+                            progress = (completedVerseKeys.size / 6236f).coerceIn(0f, 1f),
+                            modifier = Modifier.fillMaxWidth(),
+                            color = QuranEmerald,
+                            trackColor = QuranMuted.copy(alpha = 0.2f)
+                        )
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                            TextButton(onClick = { showResetKhatmaDialog = true }) {
+                                Text("إعادة ضبط", color = QuranMuted, fontSize = 11.sp)
+                            }
+                        }
                     }
                 }
             }
-        }
-        QuranAudioPlayerBar(mediaController, selectedAudioSource, { selectedAudioSource = it }, Modifier.padding(bottom = 10.dp))
-        OutlinedTextField(
-            value = search,
-            onValueChange = { search = it },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            placeholder = { Text("ابحث باسم السورة أو جزء من آية", color = QuranMuted) },
-            leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null, tint = QuranGold) },
-            trailingIcon = {
-                if (search.isNotEmpty()) IconButton(onClick = { search = "" }) {
-                    Icon(Icons.Outlined.Close, contentDescription = "مسح البحث", tint = QuranMuted)
+            stickyHeader(key = "quran_search") {
+                Surface(color = QuranInk, modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = search,
+                        onValueChange = { search = it },
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                        singleLine = true,
+                        placeholder = { Text("ابحث باسم السورة أو جزء من آية", color = QuranMuted) },
+                        leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null, tint = QuranGold) },
+                        trailingIcon = {
+                            if (search.isNotEmpty()) IconButton(onClick = { search = "" }) {
+                                Icon(Icons.Outlined.Close, contentDescription = "مسح البحث", tint = QuranMuted)
+                            }
+                        },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = QuranWhite,
+                            unfocusedTextColor = QuranWhite,
+                            focusedBorderColor = QuranEmerald,
+                            unfocusedBorderColor = QuranMuted.copy(alpha = 0.45f),
+                            cursorColor = QuranGold
+                        ),
+                        shape = RoundedCornerShape(15.dp)
+                    )
                 }
-            },
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedTextColor = QuranWhite,
-                unfocusedTextColor = QuranWhite,
-                focusedBorderColor = QuranEmerald,
-                unfocusedBorderColor = QuranMuted.copy(alpha = 0.45f),
-                cursorColor = QuranGold
-            ),
-            shape = RoundedCornerShape(15.dp)
-        )
-        Spacer(Modifier.height(12.dp))
-        when {
-            loading -> Text("جارٍ تجهيز المصحف…", modifier = Modifier.padding(16.dp), color = QuranMuted)
-            loadError -> Text("تعذّر التحقق من اكتمال ملف المصحف. لم نعرض محتوى غير مكتمل.", modifier = Modifier.padding(16.dp), color = QuranGold)
-            normalizedQuery.length >= 2 -> {
-                Text("نتائج البحث: ${verseResults.size}", modifier = Modifier.padding(vertical = 8.dp), color = QuranMuted, fontSize = 12.sp)
-                LazyColumn {
+            }
+            when {
+                loading -> item(key = "quran_loading") {
+                    Text("جارٍ تجهيز المصحف…", modifier = Modifier.padding(16.dp), color = QuranMuted)
+                }
+                loadError -> item(key = "quran_error") {
+                    Text("تعذّر التحقق من اكتمال ملف المصحف. لم نعرض محتوى غير مكتمل.", modifier = Modifier.padding(16.dp), color = QuranGold)
+                }
+                normalizedQuery.length >= 2 -> {
+                    item(key = "search_count") {
+                        Text("نتائج البحث: ${verseResults.size}", modifier = Modifier.padding(vertical = 8.dp), color = QuranMuted, fontSize = 12.sp)
+                    }
                     items(verseResults, key = { "${it.first.number}:${it.second.number}" }) { result ->
                         val surah = result.first
                         val verse = result.second
@@ -630,40 +670,36 @@ fun QuranReaderScreen(
                         }
                     }
                 }
-            }
-            else -> {
-                LazyColumn {
-                    items(matchingSurahs, key = { it.number }) { surah ->
-                        Card(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
-                                .clickable { selectedSurah = surah },
-                            colors = CardDefaults.cardColors(containerColor = QuranPanel),
-                            shape = RoundedCornerShape(15.dp)
+                else -> items(matchingSurahs, key = { it.number }) { surah ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                            .clickable { selectedSurah = surah },
+                        colors = CardDefaults.cardColors(containerColor = QuranPanel),
+                        shape = RoundedCornerShape(15.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(15.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(15.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Box(
-                                        modifier = Modifier.size(37.dp).background(QuranEmerald.copy(alpha = 0.25f), CircleShape),
-                                        contentAlignment = Alignment.Center
-                                    ) { Text(surah.number.toString(), color = QuranGold, fontSize = 12.sp) }
-                                    Spacer(Modifier.size(12.dp))
-                                    Column {
-                                        Text(surah.name, color = QuranWhite, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                                        Text("سورة رقم ${surah.number}", color = QuranMuted, fontSize = 10.sp)
-                                    }
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier.size(37.dp).background(QuranEmerald.copy(alpha = 0.25f), CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) { Text(surah.number.toString(), color = QuranGold, fontSize = 12.sp) }
+                                Spacer(Modifier.size(12.dp))
+                                Column {
+                                    Text(surah.name, color = QuranWhite, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                                    Text("سورة رقم ${surah.number}", color = QuranMuted, fontSize = 10.sp)
                                 }
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text("${surah.verses.size} آية", color = QuranMuted, fontSize = 11.sp)
-                                    IconButton(
-                                        enabled = mediaController != null,
-                                        onClick = { mediaController?.let { playQuranRecitation(it, surah.number, selectedAudioSource) } }
-                                    ) {
-                                        Icon(Icons.Outlined.PlayCircleOutline, contentDescription = "استماع لسورة ${surah.name}", tint = QuranGold)
-                                    }
+                            }
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("${surah.verses.size} آية", color = QuranMuted, fontSize = 11.sp)
+                                IconButton(
+                                    enabled = mediaController != null,
+                                    onClick = { mediaController?.let { playQuranRecitation(it, surah.number, selectedAudioSource) } }
+                                ) {
+                                    Icon(Icons.Outlined.PlayCircleOutline, contentDescription = "استماع لسورة ${surah.name}", tint = QuranGold)
                                 }
                             }
                         }

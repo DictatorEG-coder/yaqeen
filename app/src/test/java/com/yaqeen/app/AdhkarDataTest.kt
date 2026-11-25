@@ -5,42 +5,39 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AdhkarDataTest {
-
     @Test
-    fun everyDhikrHasUniqueIdValidCountAndVerifiedHttpsSource() {
-        assertEquals(
-            verifiedAdhkarEntries.size,
-            verifiedAdhkarEntries.map { it.id }.distinct().size
-        )
+    fun completeHisnAlMuslimDatasetHasUniqueIdsAndValidCounts() {
+        assertEquals(267, verifiedAdhkarEntries.size)
+        assertEquals(267, verifiedAdhkarEntries.map { it.id }.distinct().size)
+        assertEquals(132, verifiedAdhkarEntries.map { it.category }.distinct().size)
         verifiedAdhkarEntries.forEach { entry ->
-            assertTrue(entry.id.isNotBlank())
+            assertTrue(entry.id.startsWith("hisn_"))
             assertTrue(entry.text.isNotBlank())
             assertTrue(entry.targetCount > 0)
-            assertTrue(entry.sourceLabel.isNotBlank())
-            assertTrue(entry.sourceUrl.startsWith("https://sunnah.com/"))
+            assertTrue(entry.sourceLabel.contains("حصن المسلم"))
+            assertEquals("https://github.com/YousefAsalya/Islamic-Pro-azkar-API", entry.sourceUrl)
         }
     }
 
     @Test
-    fun includesOnlyTheReviewedInitialCategories() {
-        assertEquals(
-            setOf("morning", "evening", "sleep"),
-            verifiedAdhkarEntries.map { it.category }.toSet()
-        )
-        assertEquals(2, verifiedAdhkarEntries.count { it.category == "morning" })
-        assertEquals(1, verifiedAdhkarEntries.count { it.category == "evening" })
-        assertEquals(4, verifiedAdhkarEntries.count { it.category == "sleep" })
+    fun searchFindsDhikrTextWithoutArabicDiacritics() {
+        val results = filterAdhkarEntries("الحمد لله")
+        assertTrue(results.isNotEmpty())
+        assertTrue(results.all { normalizeAdhkarSearch(it.text).contains("الحمد لله") ||
+            normalizeAdhkarSearch(it.category).contains("الحمد لله") })
+    }
+
+    @Test
+    fun categoryFilterAndTextSearchCanBeCombined() {
+        val category = verifiedAdhkarEntries.first().category
+        val results = filterAdhkarEntries("الله", category)
+        assertTrue(results.isNotEmpty())
+        assertTrue(results.all { it.category == category })
     }
 
     @Test
     fun dailyCounterKeysAreSeparatedByDateAndDhikr() {
-        assertEquals(
-            "adhkar:20261124:sleep_tasbih",
-            adhkarStorageKey("20261124", "sleep_tasbih")
-        )
-        assertTrue(
-            adhkarStorageKey("20261124", "sleep_tasbih") !=
-                adhkarStorageKey("20261125", "sleep_tasbih")
-        )
+        assertEquals("adhkar:20261124:hisn_28_1", adhkarStorageKey("20261124", "hisn_28_1"))
+        assertTrue(adhkarStorageKey("20261124", "hisn_28_1") != adhkarStorageKey("20261125", "hisn_28_1"))
     }
 }
