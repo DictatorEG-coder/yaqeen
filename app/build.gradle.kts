@@ -24,7 +24,7 @@ android {
             storeType = "PKCS12"
             storePassword = "yaqeenDebugStore2026"
             keyAlias = "yaqeen-debug"
-            keyPassword = "yaqeenDebugKey2026"
+            keyPassword = "yaqeenDebugStore2026"
         }
     }
 
