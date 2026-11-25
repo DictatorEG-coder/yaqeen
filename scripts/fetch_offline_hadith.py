@@ -160,9 +160,9 @@ def main() -> None:
                 db.executemany("""
                     INSERT INTO hadiths (
                         collection_id, book_number, chapter_number, hadith_number, reference,
-                        chapter_name_ar, text_ar, matn_ar, narrator, grade_ar,
+                        chapter_name_ar, text_ar, narrator, grade_ar,
                         source_reference, url_source, search_text
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, hadith_rows)
                 seen.add(collection_id)
                 total += collection_count
