@@ -332,7 +332,8 @@ internal fun QuranAudioPlayerBar(
     controller: MediaController?,
     selectedSource: QuranAudioSource,
     onSourceSelected: (QuranAudioSource) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    availableSources: List<QuranAudioSource> = quranAudioSources
 ) {
     if (controller == null) return
 
