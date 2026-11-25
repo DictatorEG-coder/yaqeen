@@ -29,6 +29,9 @@ jobs:
         with:
           gradle-version: '8.9'
 
+      - name: Download and verify offline Arabic tafsir
+        run: python3 scripts/fetch_offline_tafsir.py
+
       - name: Build debug APK
         run: gradle -PQF_PROXY_BASE_URL="${{ vars.QF_PROXY_BASE_URL }}" assembleDebug
 
