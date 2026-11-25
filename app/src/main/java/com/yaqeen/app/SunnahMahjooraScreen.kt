@@ -82,6 +82,7 @@ private val reviewedSunnahPractices = listOf(
 
 @Composable
 internal fun SunnahMahjooraScreen(modifier: Modifier = Modifier) {
+    val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
     var search by remember { mutableStateOf("") }
     val results = reviewedSunnahPractices.filter {
         it.title.contains(search.trim(), true) || it.description.contains(search.trim(), true)
@@ -125,7 +126,7 @@ internal fun SunnahMahjooraScreen(modifier: Modifier = Modifier) {
                         fontSize = 11.sp,
                         modifier = Modifier.padding(top = 8.dp).clickable {
                             // The reference URL is opened by the system browser through the user's tap.
-                            androidx.compose.ui.platform.LocalUriHandler.current.openUri(sunnah.url)
+                            uriHandler.openUri(sunnah.url)
                         }
                     )
                 }
