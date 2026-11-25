@@ -72,11 +72,11 @@ internal fun QuranListeningScreen(modifier: Modifier = Modifier) {
     val surahs = remember { surahNames.mapIndexed { index, name -> (index + 1) to name } }
     val normalizedQuery = remember(search) { normalizeListenSearch(search) }
     val filteredSurahs = surahs.filter { item ->
-        search.isBlank() ||
+        item.first in selectedSurahs && (search.isBlank() ||
             normalizeListenSearch(item.second).contains(normalizedQuery) ||
             quranTextData.firstOrNull { it.number == item.first }?.verses?.any {
                 normalizeListenSearch(it.text).contains(normalizedQuery)
-            } == true
+            } == true)
     }
 
     Column(
@@ -148,7 +148,8 @@ internal fun QuranListeningScreen(modifier: Modifier = Modifier) {
                         selectedReciter = it.reciterName
                         selectedSurahs = activeRecordings.firstOrNull { recording -> recording.source.id == it.id }?.availableSurahs ?: (1..114).toList()
                     },
-                    availableSources = availableSources
+                    availableSources = availableSources,
+                    availableSurahMap = activeRecordings.associate { it.source.id to it.availableSurahs }
                 )
                 Spacer(Modifier.height(12.dp))
                 Text(
