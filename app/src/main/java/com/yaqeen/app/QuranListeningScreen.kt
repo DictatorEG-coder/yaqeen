@@ -79,7 +79,10 @@ internal fun QuranListeningScreen(modifier: Modifier = Modifier) {
             selectedReciter == null -> {
                 Text("القراء المتاحون", color = ListenText, fontSize = 17.sp, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(10.dp))
-                grouped.keys.forEach { name ->
+                if (loadingCatalog) Text("جارٍ تحميل فهرس القراء والتلاوات…", color = ListenMuted, fontSize = 11.sp)
+                if (catalogError) Text("تعذّر تحديث الفهرس؛ نعرض القائمة المحلية المتاحة في التطبيق.", color = ListenMuted, fontSize = 11.sp)
+                OutlinedTextField(value = reciterSearch, onValueChange = { reciterSearch = it }, modifier = Modifier.fillMaxWidth(), singleLine = true, label = { Text("ابحث عن قارئ") })
+                grouped.keys.filter { it.contains(reciterSearch.trim(), ignoreCase = true) }.forEach { name ->
                     ListenChoice(Icons.Outlined.Headphones, name, "عرض أنماط التسجيل المتاحة") {
                         selectedReciter = name
                     }
@@ -91,9 +94,10 @@ internal fun QuranListeningScreen(modifier: Modifier = Modifier) {
                 }
                 Spacer(Modifier.height(12.dp))
                 Text("أنماط التلاوة المتاحة", color = ListenText, fontSize = 17.sp, fontWeight = FontWeight.Bold)
-                grouped[selectedReciter].orEmpty().forEach { source ->
-                    ListenChoice(Icons.Outlined.PlayCircleOutline, source.style, source.reciterName) {
-                        selectedSource = source
+                grouped[selectedReciter].orEmpty().forEach { recording ->
+                    ListenChoice(Icons.Outlined.PlayCircleOutline, recording.source.style, recording.availableSurahs.size.toString() + " سورة متاحة") {
+                        selectedSource = recording.source
+                        selectedSurahs = recording.availableSurahs
                     }
                 }
             }
