@@ -25,6 +25,8 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -81,6 +83,8 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.media3.session.MediaController
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -347,115 +351,259 @@ private fun HomeScreen(modifier: Modifier = Modifier, onNavigate: (Int) -> Unit)
 
 @Composable
 private fun HadithLibraryScreen(modifier: Modifier = Modifier) {
-    val client = remember { SunnahApiClient() }
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val collectionNames = remember { linkedMapOf(
-        "bukhari" to "صحيح البخاري", "muslim" to "صحيح مسلم",
-        "abudawud" to "سنن أبي داود", "tirmidhi" to "جامع الترمذي",
-        "nasai" to "سنن النسائي", "ibnmajah" to "سنن ابن ماجه"
-    ) }
-    var collections by remember { mutableStateOf<Map<String, SunnahCollection>>(emptyMap()) }
-    var booksByCollection by remember { mutableStateOf<Map<String, List<SunnahBook>>>(emptyMap()) }
-    var selectedCollection by remember { mutableStateOf<String?>(null) }
-    var selectedBook by remember { mutableStateOf<SunnahBook?>(null) }
-    var hadiths by remember { mutableStateOf<List<SunnahHadith>>(emptyList()) }
-    var nextPage by remember { mutableStateOf<Int?>(null) }
-    var loading by remember { mutableStateOf(false) }
-    var initialized by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
+    var collections by remember { mutableStateOf<List<OfflineHadithCollection>>(emptyList()) }
+    var books by remember { mutableStateOf<List<OfflineHadithBook>>(emptyList()) }
+    var selectedCollection by remember { mutableStateOf<OfflineHadithCollection?>(null) }
+    // null means the book index; empty string means a flat collection without books.
+    var selectedBookNumber by remember { mutableStateOf<String?>(null) }
     var search by remember { mutableStateOf("") }
+    var hadiths by remember { mutableStateOf<List<OfflineHadith>>(emptyList()) }
+    var total by remember { mutableIntStateOf(0) }
+    var loading by remember { mutableStateOf(false) }
+    var loadingMore by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(client.isConfigured) {
-        if (!client.isConfigured) { initialized = true; return@LaunchedEffect }
+    LaunchedEffect(Unit) {
         loading = true
-        val loadedCollections = collections.toMutableMap()
-        val loadedBooks = booksByCollection.toMutableMap()
-        collectionNames.keys.forEach { slug ->
-            try {
-                val collection = client.fetchCollection(slug)
-                val books = client.fetchBooks(slug).data
-                loadedCollections[slug] = collection
-                loadedBooks[slug] = books
-                collections = loadedCollections.toMap()
-                booksByCollection = loadedBooks.toMap()
-            } catch (_: Exception) {
-                if (error == null) error = "تعذّر تحميل بعض المجموعات. ستظل المجموعات التي تم تحميلها متاحة."
+        try {
+            collections = withContext(Dispatchers.IO) {
+                OfflineHadithRepository.collections(context.applicationContext)
             }
-        }
-        loading = false
-        initialized = true
-    }
-
-    fun loadHadithPage(collection: String, book: SunnahBook, page: Int, append: Boolean) {
-        scope.launch {
-            loading = true
-            error = null
-            try {
-                val result = client.fetchBookHadiths(collection, book.bookNumber, page, 100)
-                hadiths = if (append) hadiths + result.data else result.data
-                nextPage = result.nextPage
-            } catch (_: Exception) {
-                error = "تعذّر تحميل أحاديث هذا الكتاب من المصدر."
-            } finally { loading = false }
+            if (collections.isEmpty()) error = "قاعدة الأحاديث المحلية غير موجودة في هذه النسخة."
+        } catch (failure: Exception) {
+            error = failure.message ?: "تعذّر فتح مكتبة الأحاديث المحلية."
+        } finally {
+            loading = false
         }
     }
 
-    val visibleHadiths = remember(hadiths, search) {
-        if (search.isBlank()) hadiths else hadiths.filter {
-            (it.arabicText.orEmpty() + " " + it.hadithNumber + " " + it.texts.mapNotNull { t -> t.chapterTitle }.joinToString(" ")).contains(search.trim(), ignoreCase = true)
+    LaunchedEffect(selectedCollection?.id) {
+        val collection = selectedCollection ?: return@LaunchedEffect
+        selectedBookNumber = null
+        search = ""
+        hadiths = emptyList()
+        try {
+            books = withContext(Dispatchers.IO) {
+                OfflineHadithRepository.books(context.applicationContext, collection.id)
+            }
+            if (books.isEmpty()) selectedBookNumber = ""
+        } catch (failure: Exception) {
+            error = failure.message ?: "تعذّر تحميل فهرس الكتب."
         }
     }
 
-    PageColumn(modifier) {
-        PageHeader("مكتبة الحديث", "الكتب الستة · بحث بالنص والمرجع · مع بيان المصدر")
-        if (!client.isConfigured) {
-            InfoCard("مكتبة الحديث غير مهيأة", "يلزم ربط مصدر البيانات بالخادم قبل عرض النصوص. لن نعرض أحاديث وهمية أو غير موثقة.")
-        } else if (!initialized && loading) {
-            InfoCard("جارٍ تحميل فهارس الكتب", "يتم جلب بيانات المجموعات والكتب من المصدر.")
+    LaunchedEffect(selectedCollection?.id, selectedBookNumber, search) {
+        val collection = selectedCollection ?: return@LaunchedEffect
+        val bookNumber = selectedBookNumber ?: return@LaunchedEffect
+        delay(220)
+        loading = true
+        error = null
+        try {
+            val result = withContext(Dispatchers.IO) {
+                OfflineHadithRepository.search(
+                    context.applicationContext,
+                    collection.id,
+                    bookNumber.takeIf { it.isNotEmpty() },
+                    search,
+                    limit = 100,
+                    offset = 0
+                )
+            }
+            hadiths = result.items
+            total = result.total
+        } catch (failure: Exception) {
+            error = failure.message ?: "تعذّر البحث في قاعدة الأحاديث."
+        } finally {
+            loading = false
         }
-        if (selectedBook != null && selectedCollection != null) {
-            val collection = selectedCollection!!
-            val book = selectedBook!!
-            SimpleRow(Icons.Outlined.ArrowBack, "العودة إلى الكتب", collectionNames[collection] ?: collection, onClick = { selectedBook = null; hadiths = emptyList(); nextPage = null; search = "" })
-            Spacer(Modifier.height(8.dp))
-            Text(book.arabicName ?: book.englishName ?: "كتاب ${book.bookNumber}", color = Gold, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-            Text("${book.numberOfHadith} حديثًا · المرجع ${book.hadithStartNumber}–${book.hadithEndNumber}", color = Muted, fontSize = 11.sp)
-            Spacer(Modifier.height(10.dp))
-            OutlinedTextField(value = search, onValueChange = { search = it }, modifier = Modifier.fillMaxWidth(), label = { Text("ابحث في الأحاديث المحمّلة") }, singleLine = true)
-            visibleHadiths.forEach { hadith ->
-                Card(modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp), shape = RoundedCornerShape(17.dp), colors = CardDefaults.cardColors(containerColor = Panel)) {
-                    Column(Modifier.padding(15.dp)) {
-                        Text("حديث رقم ${hadith.hadithNumber}", color = Gold, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                        hadith.texts.firstOrNull { it.language == "ar" }?.chapterTitle?.let { Text(it, color = Muted, fontSize = 11.sp) }
-                        Spacer(Modifier.height(8.dp))
-                        Text(hadith.arabicText ?: "النص العربي غير متاح في سجل المصدر.", color = MainText, fontSize = 18.sp, lineHeight = 32.sp)
-                        if (hadith.grades.isNotEmpty()) Text(hadith.grades.joinToString(" · ") { "${it.grade} — ${it.gradedBy}" }, color = Gold, fontSize = 10.sp)
-                        Text("المصدر: ${collectionNames[collection]} · ${hadith.hadithNumber}", color = Muted, fontSize = 10.sp)
+    }
+
+    val selectedBook = books.firstOrNull { it.number == selectedBookNumber }
+    LazyColumn(
+        modifier = modifier.fillMaxSize().background(Ink).padding(horizontal = 16.dp)
+    ) {
+        item(key = "hadith_header") {
+            PageHeader(
+                "مكتبة الحديث",
+                "١٧ مصنّفًا · ٤٦ ألف حديث تقريبًا · بحث محلي دون إنترنت"
+            )
+        }
+
+        if (selectedCollection == null) {
+            items(collections, key = { it.id }) { collection ->
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp)
+                        .clickable {
+                            selectedCollection = collection
+                            selectedBookNumber = null
+                            search = ""
+                            error = null
+                        },
+                    colors = CardDefaults.cardColors(containerColor = Panel),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(15.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(collection.nameArabic, color = MainText, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                            Text(
+                                if (collection.bookCount > 0) "${collection.bookCount} كتابًا · ${collection.totalHadiths} حديثًا"
+                                else "${collection.totalHadiths} حديثًا · مجموعة مختارة",
+                                color = Muted,
+                                fontSize = 11.sp
+                            )
+                        }
+                        Icon(Icons.Outlined.LibraryBooks, contentDescription = null, tint = Gold)
                     }
                 }
             }
-            if (loading) Text("جارٍ التحميل…", color = Muted)
-            if (error != null) InfoCard("ملاحظة", error!!)
-            nextPage?.let { page -> Button(onClick = { loadHadithPage(collection, book, page, true) }, enabled = !loading, colors = ButtonDefaults.buttonColors(containerColor = Emerald)) { Text("تحميل الصفحة التالية") } }
-            if (search.isNotBlank() && visibleHadiths.isEmpty()) InfoCard("لا توجد نتيجة في الصفحة المحمّلة", "جرّب عبارة أخرى أو حمّل الصفحة التالية. البحث هنا لا يدّعي فهرسة الكتاب كاملًا.")
-        } else if (selectedCollection != null) {
-            val collection = selectedCollection!!
-            SimpleRow(Icons.Outlined.ArrowBack, "العودة إلى المجموعات", collectionNames[collection] ?: collection, onClick = { selectedCollection = null })
-            (booksByCollection[collection] ?: emptyList()).forEach { book ->
-                SimpleRow(Icons.Outlined.LibraryBooks, book.arabicName ?: book.englishName ?: "كتاب ${book.bookNumber}", "${book.numberOfHadith} حديثًا", onClick = { selectedBook = book; hadiths = emptyList(); nextPage = null; search = ""; loadHadithPage(collection, book, 1, false) })
+            if (loading && collections.isEmpty()) item { InfoCard("جارٍ تجهيز المكتبة", "يتم فتح قاعدة الأحاديث المحلية.") }
+            item {
+                InfoCard(
+                    "مصدر البيانات",
+                    "Open Hadith Data · النصوص العربية فقط · CC0 للبيانات المهيكلة. جُمعت البيانات آليًا؛ راجع الطبعات المحققة عند الدراسة والعمل بالحديث."
+                )
             }
-            if ((booksByCollection[collection] ?: emptyList()).isEmpty() && !loading) InfoCard("فهرس الكتاب غير متاح", error ?: "لم يرجع المصدر قائمة الكتب لهذه المجموعة.")
+        } else if (selectedBookNumber == null) {
+            item {
+                SimpleRow(
+                    Icons.Outlined.ArrowBack,
+                    "العودة إلى المصنّفات",
+                    selectedCollection!!.nameArabic,
+                    onClick = { selectedCollection = null; books = emptyList() }
+                )
+                Spacer(Modifier.height(8.dp))
+                Text("اختر الكتاب", color = Gold, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            }
+            items(books, key = { it.number }) { book ->
+                SimpleRow(
+                    Icons.Outlined.MenuBook,
+                    book.nameArabic,
+                    "${book.totalHadiths} حديثًا",
+                    onClick = { selectedBookNumber = book.number; search = ""; hadiths = emptyList() }
+                )
+            }
+            if (books.isEmpty() && !loading) item {
+                InfoCard("لا توجد كتب فرعية", "هذه المجموعة تعرض أحاديثها مباشرة.")
+            }
         } else {
-            collectionNames.forEach { (slug, title) ->
-                val info = collections[slug]
-                SimpleRow(Icons.Outlined.LibraryBooks, title, if (info == null) "لم يتم تحميل بيانات هذه المجموعة" else "${info.totalAvailableHadith} من ${info.totalHadith} حديث متاح", onClick = { selectedCollection = slug })
+            item {
+                SimpleRow(
+                    Icons.Outlined.ArrowBack,
+                    if (selectedBookNumber!!.isEmpty()) "العودة إلى المصنّفات" else "العودة إلى الكتب",
+                    selectedBook?.nameArabic ?: selectedCollection!!.nameArabic,
+                    onClick = {
+                        if (selectedBookNumber!!.isEmpty()) {
+                            selectedCollection = null
+                            books = emptyList()
+                        } else {
+                            selectedBookNumber = null
+                            hadiths = emptyList()
+                        }
+                    }
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    selectedBook?.nameArabic ?: selectedCollection!!.nameArabic,
+                    color = Gold,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    if (search.isBlank()) "${total} حديثًا في هذا القسم" else "${total} نتيجة في كامل هذا القسم",
+                    color = Muted,
+                    fontSize = 11.sp
+                )
+                Spacer(Modifier.height(9.dp))
+                OutlinedTextField(
+                    value = search,
+                    onValueChange = { search = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    label = { Text("ابحث في جميع أحاديث هذا القسم") }
+                )
+                Spacer(Modifier.height(8.dp))
             }
-            if (error != null) InfoCard("بعض المصادر لم تستجب", error!!)
-            InfoCard("تنبيه بشأن الأحكام", "نعرض أحكام المحدّثين فقط إذا أعادها المصدر صراحةً. وجود الحديث في أحد هذه الكتب لا يعني وحده أن كل رواياته صحيحة.")
+            items(hadiths, key = { "${it.collectionId}:${it.bookNumber}:${it.number}:${it.id}" }) { hadith ->
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
+                    shape = RoundedCornerShape(17.dp),
+                    colors = CardDefaults.cardColors(containerColor = Panel)
+                ) {
+                    Column(Modifier.padding(15.dp)) {
+                        Text(
+                            hadith.reference ?: "حديث رقم ${hadith.number}",
+                            color = Gold,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        hadith.chapterNameArabic?.let {
+                            Text(it, color = Muted, fontSize = 11.sp)
+                        }
+                        hadith.narrator?.let {
+                            Text("الراوي: $it", color = Muted, fontSize = 10.sp)
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        Text(hadith.textArabic, color = MainText, fontSize = 18.sp, lineHeight = 33.sp)
+                        hadith.gradeArabic?.let {
+                            Spacer(Modifier.height(7.dp))
+                            Text("الحكم المنقول: $it", color = Gold, fontSize = 10.sp)
+                        }
+                        hadith.sourceReference?.let {
+                            Text("الإحالة: $it", color = Muted, fontSize = 10.sp)
+                        }
+                    }
+                }
+            }
+            if (loading) item { Text("جارٍ البحث في كامل القسم…", color = Muted, modifier = Modifier.padding(12.dp)) }
+            if (error != null) item { InfoCard("تعذّر عرض البيانات", error!!) }
+            if (!loading && hadiths.isEmpty() && error == null) {
+                item { InfoCard("لا توجد نتائج", "جرّب عبارة أخرى أو احذف البحث لعرض الأحاديث.") }
+            }
+            if (hadiths.size < total) item {
+                Button(
+                    onClick = {
+                        val collection = selectedCollection ?: return@Button
+                        val book = selectedBookNumber ?: return@Button
+                        scope.launch {
+                            loadingMore = true
+                            try {
+                                val next = withContext(Dispatchers.IO) {
+                                    OfflineHadithRepository.search(
+                                        context.applicationContext,
+                                        collection.id,
+                                        book.takeIf { it.isNotEmpty() },
+                                        search,
+                                        limit = 100,
+                                        offset = hadiths.size
+                                    )
+                                }
+                                hadiths = hadiths + next.items
+                                total = next.total
+                            } catch (failure: Exception) {
+                                error = failure.message ?: "تعذّر تحميل المزيد."
+                            } finally {
+                                loadingMore = false
+                            }
+                        }
+                    },
+                    enabled = !loadingMore && !loading,
+                    colors = ButtonDefaults.buttonColors(containerColor = Emerald),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(if (loadingMore) "جارٍ تحميل المزيد…" else "تحميل المزيد · ${(total - hadiths.size).coerceAtLeast(0)} متبقٍ")
+                }
+            }
         }
-        Spacer(Modifier.height(22.dp))
+        item { Spacer(Modifier.height(20.dp)) }
     }
 }
+
 @Composable
 private fun AdhkarScreen(modifier: Modifier = Modifier) {
     val context = LocalContext.current
