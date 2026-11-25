@@ -66,14 +66,18 @@ internal fun QuranListeningScreen(
     val downloads by QuranPlaybackService.downloads.collectAsState()
     val context = LocalContext.current
     var quranTextData by remember { mutableStateOf<List<QuranSurah>>(emptyList()) }
-    LaunchedEffect(context) { quranTextData = withContext(Dispatchers.IO) { loadQuran(context) } }
+    LaunchedEffect(context) {
+        quranTextData = withContext(Dispatchers.IO) { loadQuran(context) }
+    }
     var recordings by remember { mutableStateOf<List<QuranRecording>>(emptyList()) }
     var loadingCatalog by remember { mutableStateOf(true) }
     var catalogError by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
-        runCatching { Mp3QuranCatalogClient.fetchRecitations() }
+    LaunchedEffect(context) {
+        val cached = Mp3QuranCatalogClient.loadCachedRecitations(context)
+        if (cached.isNotEmpty()) recordings = cached
+        runCatching { Mp3QuranCatalogClient.fetchRecitations(context) }
             .onSuccess { recordings = it }
-            .onFailure { catalogError = true }
+            .onFailure { catalogError = recordings.isEmpty() }
         loadingCatalog = false
     }
     val activeRecordings = if (recordings.isNotEmpty()) recordings else quranAudioSources.map {
@@ -87,184 +91,209 @@ internal fun QuranListeningScreen(
     var reciterSearch by remember { mutableStateOf("") }
     var search by remember { mutableStateOf("") }
     val surahs = remember { surahNames.mapIndexed { index, name -> (index + 1) to name } }
+    val normalizedVerseIndex = remember(quranTextData) {
+        quranTextData.associate { surah ->
+            surah.number to surah.verses.map { normalizeListenSearch(it.text) }
+        }
+    }
     val normalizedQuery = remember(search) { normalizeListenSearch(search) }
-    val filteredSurahs = surahs.filter { item ->
-        item.first in selectedSurahs && (search.isBlank() ||
-            normalizeListenSearch(item.second).contains(normalizedQuery) ||
-            quranTextData.firstOrNull { it.number == item.first }?.verses?.any {
-                normalizeListenSearch(it.text).contains(normalizedQuery)
-            } == true)
+    val filteredSurahs = remember(surahs, selectedSurahs, normalizedQuery, normalizedVerseIndex) {
+        surahs.filter { item ->
+            item.first in selectedSurahs && (normalizedQuery.isBlank() ||
+                normalizeListenSearch(item.second).contains(normalizedQuery) ||
+                normalizedVerseIndex[item.first].orEmpty().any { it.contains(normalizedQuery) })
+        }
     }
 
-    Column(
-        modifier = modifier.fillMaxSize().background(ListenBackground)
-            .verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)
+    LazyColumn(
+        modifier = modifier.fillMaxSize().background(ListenBackground).padding(horizontal = 20.dp)
     ) {
-        Spacer(Modifier.height(24.dp))
-        Text("استماع القرآن", color = ListenGold, fontSize = 26.sp, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(5.dp))
-        Text("اختر القارئ، ثم نمط التلاوة، ثم السورة.", color = ListenMuted, fontSize = 12.sp)
-        Spacer(Modifier.height(22.dp))
+        item {
+            Spacer(Modifier.height(24.dp))
+            Text("استماع القرآن", color = ListenGold, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(5.dp))
+            Text("اختر القارئ، ثم نمط التلاوة، ثم السورة.", color = ListenMuted, fontSize = 12.sp)
+            Spacer(Modifier.height(22.dp))
+        }
 
         when {
             selectedReciter == null -> {
-                Text("القراء المتاحون", color = ListenText, fontSize = 17.sp, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(10.dp))
-                if (loadingCatalog) Text("جارٍ تحميل فهرس القراء والتلاوات…", color = ListenMuted, fontSize = 11.sp)
-                if (catalogError) Text("تعذّر تحديث الفهرس؛ نعرض القائمة المحلية المتاحة في التطبيق.", color = ListenMuted, fontSize = 11.sp)
-                OutlinedTextField(value = reciterSearch, onValueChange = { reciterSearch = it }, modifier = Modifier.fillMaxWidth(), singleLine = true, label = { Text("ابحث عن قارئ") })
-                grouped.keys.filter { it.contains(reciterSearch.trim(), ignoreCase = true) }.forEach { name ->
-                    ListenChoice(Icons.Outlined.Headphones, name, "عرض أنماط التسجيل المتاحة") {
+                item {
+                    Text("القراء المتاحون", color = ListenText, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(10.dp))
+                    if (loadingCatalog) Text("جارٍ تحميل فهرس القراء والتلاوات…", color = ListenMuted, fontSize = 11.sp)
+                    if (catalogError) Text("تعذّر تحديث الفهرس؛ نعرض آخر نسخة محفوظة والقائمة المحلية.", color = ListenMuted, fontSize = 11.sp)
+                    OutlinedTextField(
+                        value = reciterSearch,
+                        onValueChange = { reciterSearch = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        label = { Text("ابحث عن قارئ") }
+                    )
+                    Spacer(Modifier.height(8.dp))
+                }
+                items(
+                    grouped.keys.filter { it.contains(reciterSearch.trim(), ignoreCase = true) },
+                    key = { it }
+                ) { name ->
+                    ListenChoice(Icons.Outlined.Headphones, name, "${grouped[name].orEmpty().size} نمط تلاوة متاح") {
                         selectedReciter = name
                     }
                 }
             }
+
             selectedSource == null -> {
-                ListenChoice(Icons.Outlined.ArrowBack, "قائمة القراء", "تغيير القارئ") {
-                    selectedReciter = null
+                item {
+                    ListenChoice(Icons.Outlined.ArrowBack, "قائمة القراء", "تغيير القارئ") {
+                        selectedReciter = null
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    Text("أنماط التلاوة المتاحة", color = ListenText, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(8.dp))
                 }
-                Spacer(Modifier.height(12.dp))
-                Text("أنماط التلاوة المتاحة", color = ListenText, fontSize = 17.sp, fontWeight = FontWeight.Bold)
-                grouped[selectedReciter].orEmpty().forEach { recording ->
-                    ListenChoice(Icons.Outlined.PlayCircleOutline, recording.source.style, recording.availableSurahs.size.toString() + " سورة متاحة") {
+                items(grouped[selectedReciter].orEmpty(), key = { it.source.id }) { recording ->
+                    ListenChoice(
+                        Icons.Outlined.PlayCircleOutline,
+                        recording.source.style,
+                        "${recording.availableSurahs.size} سورة متاحة"
+                    ) {
                         selectedSource = recording.source
                         selectedSurahs = recording.availableSurahs
                     }
                 }
             }
+
             else -> {
-                ListenChoice(Icons.Outlined.ArrowBack, "تغيير نمط التلاوة", selectedReciter.orEmpty()) {
-                    selectedSource = null
-                }
-                Spacer(Modifier.height(12.dp))
-                Text(selectedSource!!.reciterName + " · " + selectedSource!!.style, color = ListenGold, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.height(12.dp))
-                OutlinedTextField(
-                    value = search,
-                    onValueChange = { search = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    label = { Text("ابحث باسم السورة أو جزء من آية") }
-                )
-                Spacer(Modifier.height(12.dp))
-                Text("اختر السورة", color = ListenText, fontSize = 17.sp, fontWeight = FontWeight.Bold)
                 val source = selectedSource!!
-                Button(
-                    onClick = { selectedSurahs.forEach { QuranPlaybackService.enqueueDownload(source, it) } },
-                    enabled = controller != null,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = ListenGold),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Text("تنزيل كل السور المتاحة · ${selectedSurahs.size}", color = ListenBackground)
-                }
-                Spacer(Modifier.height(8.dp))
-                LazyColumn(
-                    modifier = Modifier.fillMaxWidth().heightIn(max = 430.dp)
-                ) {
-                    items(filteredSurahs, key = { it.first }) { (number, name) ->
-                        val downloadId = "quran-${source.id}-${number}"
-                        val currentDownload = downloads.firstOrNull { it.request.id == downloadId }
-                        val alreadyComplete = currentDownload?.state == androidx.media3.exoplayer.offline.Download.STATE_COMPLETED
-                        val alreadyQueued = currentDownload?.state == androidx.media3.exoplayer.offline.Download.STATE_QUEUED ||
-                            currentDownload?.state == androidx.media3.exoplayer.offline.Download.STATE_DOWNLOADING
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            ListenChoice(
-                                Icons.Outlined.PlayCircleOutline,
-                                name,
-                                "تشغيل السورة",
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                val player = controller
-                                if (player != null) playQuranRecitation(player, number, source, selectedSurahs)
-                            }
-                            IconButton(
-                                enabled = controller != null && !alreadyComplete && !alreadyQueued,
-                                onClick = { QuranPlaybackService.enqueueDownload(source, number) }
-                            ) {
-                                Icon(
-                                    Icons.Outlined.Download,
-                                    contentDescription = if (alreadyComplete) "تم تنزيل سورة $name" else "تنزيل سورة $name",
-                                    tint = if (alreadyComplete) ListenMuted else ListenGold
-                                )
-                            }
-                        }
-                    }
-                }
-                Spacer(Modifier.height(12.dp))
                 val sourceDownloads = downloads.filter { it.request.id.startsWith("quran-${source.id}-") }
-                if (sourceDownloads.isNotEmpty()) {
-                    Text("إدارة التنزيلات", color = ListenGold, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        TextButton(onClick = { QuranPlaybackService.pauseDownloads() }) {
-                            Icon(Icons.Outlined.Pause, contentDescription = null, tint = ListenGold)
-                            Text("إيقاف جميع التنزيلات", color = ListenGold, fontSize = 11.sp)
+                item {
+                    ListenChoice(Icons.Outlined.ArrowBack, "تغيير نمط التلاوة", selectedReciter.orEmpty()) {
+                        selectedSource = null
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    Text(source.reciterName + " · " + source.style, color = ListenGold, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = search,
+                        onValueChange = { search = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        label = { Text("ابحث باسم السورة أو جزء من آية") }
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    Button(
+                        onClick = { selectedSurahs.forEach { QuranPlaybackService.enqueueDownload(source, it) } },
+                        enabled = controller != null,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = ListenGold),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("تنزيل كل السور المتاحة · ${selectedSurahs.size}", color = ListenBackground)
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Text("اختر السورة", color = ListenText, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                }
+                items(filteredSurahs, key = { it.first }) { (number, name) ->
+                    val downloadId = "quran-${source.id}-${number}"
+                    val currentDownload = downloads.firstOrNull { it.request.id == downloadId }
+                    val alreadyComplete = currentDownload?.state == androidx.media3.exoplayer.offline.Download.STATE_COMPLETED
+                    val alreadyQueued = currentDownload?.state == androidx.media3.exoplayer.offline.Download.STATE_QUEUED ||
+                        currentDownload?.state == androidx.media3.exoplayer.offline.Download.STATE_DOWNLOADING
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        ListenChoice(
+                            Icons.Outlined.PlayCircleOutline,
+                            name,
+                            "تشغيل السورة",
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            if (controller != null) playQuranRecitation(controller, number, source, selectedSurahs)
                         }
-                        TextButton(onClick = { QuranPlaybackService.resumeDownloads() }) {
-                            Icon(Icons.Outlined.PlayArrow, contentDescription = null, tint = ListenGold)
-                            Text("استئناف الجميع", color = ListenGold, fontSize = 11.sp)
+                        IconButton(
+                            enabled = controller != null && !alreadyComplete && !alreadyQueued,
+                            onClick = { QuranPlaybackService.enqueueDownload(source, number) }
+                        ) {
+                            Icon(
+                                Icons.Outlined.Download,
+                                contentDescription = if (alreadyComplete) "تم تنزيل سورة $name" else "تنزيل سورة $name",
+                                tint = if (alreadyComplete) ListenMuted else ListenGold
+                            )
                         }
                     }
-                    LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 280.dp)) {
-                        items(sourceDownloads, key = { it.request.id }) { download ->
-                            val surahNumber = download.request.id.substringAfterLast('-').toIntOrNull()
-                            val surahName = surahNumber?.let { surahNames.getOrNull(it - 1) } ?: "تلاوة"
-                            val status = when (download.state) {
-                                androidx.media3.exoplayer.offline.Download.STATE_COMPLETED -> "مكتملة · متاحة دون إنترنت"
-                                androidx.media3.exoplayer.offline.Download.STATE_DOWNLOADING -> "جارٍ التنزيل"
-                                androidx.media3.exoplayer.offline.Download.STATE_QUEUED -> "في الانتظار أو متوقفة مؤقتًا"
-                                androidx.media3.exoplayer.offline.Download.STATE_FAILED -> "فشل التنزيل · يمكنك إعادة المحاولة"
-                                else -> "قيد المعالجة"
+                }
+                if (sourceDownloads.isNotEmpty()) {
+                    item {
+                        Spacer(Modifier.height(10.dp))
+                        Text("إدارة التنزيلات", color = ListenGold, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            TextButton(onClick = { QuranPlaybackService.pauseDownloads() }) {
+                                Icon(Icons.Outlined.Pause, contentDescription = null, tint = ListenGold)
+                                Text("إيقاف جميع التنزيلات", color = ListenGold, fontSize = 11.sp)
                             }
-                            Card(
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                                colors = CardDefaults.cardColors(containerColor = ListenPanel),
-                                shape = RoundedCornerShape(13.dp)
-                            ) {
-                                Column(Modifier.padding(12.dp)) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Column(Modifier.weight(1f)) {
-                                            Text(surahName, color = ListenText, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                                            Text(status, color = ListenMuted, fontSize = 10.sp)
-                                        }
-                                        IconButton(onClick = { QuranPlaybackService.removeDownload(download.request.id) }) {
-                                            Icon(Icons.Outlined.DeleteOutline, contentDescription = "حذف التنزيل", tint = ListenMuted)
-                                        }
+                            TextButton(onClick = { QuranPlaybackService.resumeDownloads() }) {
+                                Icon(Icons.Outlined.PlayArrow, contentDescription = null, tint = ListenGold)
+                                Text("استئناف الجميع", color = ListenGold, fontSize = 11.sp)
+                            }
+                        }
+                    }
+                    items(sourceDownloads, key = { it.request.id }) { download ->
+                        val surahNumber = download.request.id.substringAfterLast('-').toIntOrNull()
+                        val surahName = surahNumber?.let { surahNames.getOrNull(it - 1) } ?: "تلاوة"
+                        val status = when (download.state) {
+                            androidx.media3.exoplayer.offline.Download.STATE_COMPLETED -> "مكتملة · متاحة دون إنترنت"
+                            androidx.media3.exoplayer.offline.Download.STATE_DOWNLOADING -> "جارٍ التنزيل"
+                            androidx.media3.exoplayer.offline.Download.STATE_QUEUED -> "في الانتظار أو متوقفة مؤقتًا"
+                            androidx.media3.exoplayer.offline.Download.STATE_FAILED -> "فشل التنزيل · يمكنك إعادة المحاولة"
+                            else -> "قيد المعالجة"
+                        }
+                        Card(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                            colors = CardDefaults.cardColors(containerColor = ListenPanel),
+                            shape = RoundedCornerShape(13.dp)
+                        ) {
+                            Column(Modifier.padding(12.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Column(Modifier.weight(1f)) {
+                                        Text(surahName, color = ListenText, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                                        Text(status, color = ListenMuted, fontSize = 10.sp)
                                     }
-                                    if (download.state != androidx.media3.exoplayer.offline.Download.STATE_COMPLETED) {
-                                        val progress = (download.percentDownloaded / 100f).coerceIn(0f, 1f)
-                                        LinearProgressIndicator(
-                                            progress = progress,
-                                            modifier = Modifier.fillMaxWidth(),
-                                            color = ListenGold,
-                                            trackColor = ListenMuted.copy(alpha = 0.2f)
-                                        )
+                                    IconButton(onClick = { QuranPlaybackService.removeDownload(download.request.id) }) {
+                                        Icon(Icons.Outlined.DeleteOutline, contentDescription = "حذف التنزيل", tint = ListenMuted)
                                     }
+                                }
+                                if (download.state != androidx.media3.exoplayer.offline.Download.STATE_COMPLETED) {
+                                    LinearProgressIndicator(
+                                        progress = (download.percentDownloaded / 100f).coerceIn(0f, 1f),
+                                        modifier = Modifier.fillMaxWidth(),
+                                        color = ListenGold,
+                                        trackColor = ListenMuted.copy(alpha = 0.2f)
+                                    )
                                 }
                             }
                         }
                     }
                 }
-                Spacer(Modifier.height(12.dp))
-                QuranAudioPlayerBar(
-                    controller = controller,
-                    selectedSource = source,
-                    onSourceSelected = {
-                        selectedSource = it
-                        selectedReciter = it.reciterName
-                        selectedSurahs = activeRecordings.firstOrNull { recording -> recording.source.id == it.id }?.availableSurahs ?: (1..114).toList()
-                    },
-                    availableSources = availableSources,
-                    availableSurahMap = activeRecordings.associate { it.source.id to it.availableSurahs }
-                )
-                Spacer(Modifier.height(12.dp))
-                Text(
-                    "فهرس القراء من MP3Quran. التشغيل الحالي عبر الإنترنت؛ لا توجد تنزيلات محلية بعد، ولذلك لا تعمل التلاوات دون اتصال.",
-                    color = ListenMuted, fontSize = 11.sp
-                )
+                item {
+                    Spacer(Modifier.height(12.dp))
+                    QuranAudioPlayerBar(
+                        controller = controller,
+                        selectedSource = source,
+                        onSourceSelected = {
+                            selectedSource = it
+                            selectedReciter = it.reciterName
+                            selectedSurahs = activeRecordings.firstOrNull { recording -> recording.source.id == it.id }?.availableSurahs ?: (1..114).toList()
+                        },
+                        availableSources = availableSources,
+                        availableSurahMap = activeRecordings.associate { it.source.id to it.availableSurahs }
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        "فهرس القراء والتلاوات من MP3Quran، وتُحفظ آخر نسخة على الهاتف لتظل قائمة القراء متاحة عند انقطاع الاتصال. تنزيل السور يعمل فقط للمصادر التي تسمح روابطها بذلك.",
+                        color = ListenMuted, fontSize = 11.sp
+                    )
+                    Spacer(Modifier.height(24.dp))
+                }
             }
         }
-        Spacer(Modifier.height(24.dp))
     }
 }
 
