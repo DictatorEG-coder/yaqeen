@@ -45,8 +45,11 @@ private val ListenMuted = Color(0xFFAAB7AE)
 private val ListenText = Color(0xFFF1F3EF)
 
 @Composable
-internal fun QuranListeningScreen(modifier: Modifier = Modifier) {
-    val controller = rememberQuranMediaController()
+internal fun QuranListeningScreen(
+    modifier: Modifier = Modifier,
+    sharedMediaController: androidx.media3.session.MediaController? = null
+) {
+    val controller = sharedMediaController ?: rememberQuranMediaController()
     val context = LocalContext.current
     var quranTextData by remember { mutableStateOf<List<QuranSurah>>(emptyList()) }
     LaunchedEffect(context) { quranTextData = withContext(Dispatchers.IO) { loadQuran(context) } }
