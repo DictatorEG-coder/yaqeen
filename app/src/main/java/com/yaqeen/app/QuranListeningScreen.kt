@@ -182,11 +182,11 @@ internal fun QuranListeningScreen(
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         TextButton(onClick = { QuranPlaybackService.pauseDownloads() }) {
                             Icon(Icons.Outlined.Pause, contentDescription = null, tint = ListenGold)
-                            Text("إيقاف مؤقت", color = ListenGold, fontSize = 11.sp)
+                            Text("إيقاف جميع التنزيلات", color = ListenGold, fontSize = 11.sp)
                         }
                         TextButton(onClick = { QuranPlaybackService.resumeDownloads() }) {
                             Icon(Icons.Outlined.PlayArrow, contentDescription = null, tint = ListenGold)
-                            Text("استئناف", color = ListenGold, fontSize = 11.sp)
+                            Text("استئناف الجميع", color = ListenGold, fontSize = 11.sp)
                         }
                     }
                     sourceDownloads.forEach { download ->
