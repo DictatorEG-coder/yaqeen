@@ -80,6 +80,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.media3.session.MediaController
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -114,6 +115,7 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 private fun YaqeenApp(initialSurahNumber: Int = 0, openFridayReminders: Boolean = false) {
+    val mediaController = rememberQuranMediaController()
     var selectedTab by remember { mutableIntStateOf(if (initialSurahNumber in 1..114) 1 else if (openFridayReminders) 4 else 0) }
     var openBookmarksRequested by remember { mutableStateOf(false) }
     MaterialTheme {
@@ -121,6 +123,10 @@ private fun YaqeenApp(initialSurahNumber: Int = 0, openFridayReminders: Boolean 
             Scaffold(
                 containerColor = Ink,
                 bottomBar = {
+                    Column {
+                        mediaController?.let { player ->
+                            QuranMiniPlayer(player) { selectedTab = 6 }
+                        }
                     NavigationBar(
                         modifier = Modifier.navigationBarsPadding(),
                         containerColor = Panel,
@@ -150,6 +156,7 @@ private fun YaqeenApp(initialSurahNumber: Int = 0, openFridayReminders: Boolean 
                             )
                         }
                     }
+                    }
                 }
             ) { padding ->
                 when (selectedTab) {
@@ -161,14 +168,16 @@ private fun YaqeenApp(initialSurahNumber: Int = 0, openFridayReminders: Boolean 
                         modifier = Modifier.padding(padding),
                         showBookmarksInitially = openBookmarksRequested,
                         initialSurahNumber = initialSurahNumber,
-                        onBookmarksOpened = { openBookmarksRequested = false }
+                        onBookmarksOpened = { openBookmarksRequested = false },
+                        sharedMediaController = mediaController
                     )
                     2 -> HadithLibraryScreen(Modifier.padding(padding))
-                    6 -> QuranListeningScreen(Modifier.padding(padding))
+                    6 -> QuranListeningScreen(Modifier.padding(padding), mediaController)
                     7 -> QuranReaderScreen(
                         modifier = Modifier.padding(padding),
                         initialSurahNumber = initialSurahNumber,
-                        audioMode = true
+                        audioMode = true,
+                        sharedMediaController = mediaController
                     )
                     8 -> SunnahMahjooraScreen(Modifier.padding(padding))
                     3 -> AdhkarScreen(Modifier.padding(padding))
