@@ -38,6 +38,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.media3.session.MediaController
@@ -56,17 +57,14 @@ internal fun QuranNowPlayingScreen(
     controller: MediaController?,
     onBack: () -> Unit
 ) {
+    val context = LocalContext.current
     var recordings by remember { mutableStateOf<List<QuranRecording>>(emptyList()) }
     var selectedSource by remember { mutableStateOf(quranAudioSources.first()) }
     var trackTitle by remember { mutableStateOf("لم يبدأ التشغيل بعد") }
     var artist by remember { mutableStateOf("اختر قارئًا وسورة من مكتبة الاستماع") }
 
     LaunchedEffect(Unit) {
-        recordings = Mp3QuranCatalogClient.loadCachedRecitations(
-            // The catalog is cached in the application files directory by the listening screen.
-            // A missing cache simply leaves the built-in verified sources available.
-            YaqeenApplicationContextHolder.context ?: return@LaunchedEffect
-        )
+        recordings = Mp3QuranCatalogClient.loadCachedRecitations(context.applicationContext)
     }
 
     LaunchedEffect(controller, recordings) {
