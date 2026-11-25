@@ -336,7 +336,8 @@ internal fun QuranAudioPlayerBar(
     selectedSource: QuranAudioSource,
     onSourceSelected: (QuranAudioSource) -> Unit,
     modifier: Modifier = Modifier,
-    availableSources: List<QuranAudioSource> = quranAudioSources
+    availableSources: List<QuranAudioSource> = quranAudioSources,
+    availableSurahMap: Map<String, List<Int>> = emptyMap()
 ) {
     if (controller == null) return
 
@@ -458,7 +459,7 @@ internal fun QuranAudioPlayerBar(
                                     onSourceSelected(source)
                                     if (controller.mediaItemCount > 0) {
                                         val currentSurah = surahNumberFromMediaId(controller.currentMediaItem?.mediaId) ?: 1
-                                        playQuranRecitation(controller, currentSurah, source)
+                                        playQuranRecitation(controller, currentSurah, source, availableSurahMap[source.id] ?: (1..114).toList())
                                     }
                                     sourceMenuExpanded = false
                                 }
