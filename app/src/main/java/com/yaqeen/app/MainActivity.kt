@@ -337,40 +337,6 @@ private fun HomeScreen(modifier: Modifier = Modifier, onNavigate: (Int) -> Unit)
 }
 
 @Composable
-private fun QuranScreen(modifier: Modifier = Modifier) {
-    PageColumn(modifier) {
-        PageHeader("القرآن الكريم", "اقرأ، استمع، واحفظ موضعك")
-        InfoCard(
-            title = "ثلاث طرق للتفاعل مع القرآن",
-            body = "القراءة فقط، أو الاستماع فقط، أو متابعة المصحف مع تظليل الآية أثناء التلاوة عند توفر توقيت موثوق."
-        )
-        Spacer(Modifier.height(18.dp))
-        SectionHeading("القراء المستهدفون")
-        Spacer(Modifier.height(10.dp))
-        listOf(
-            "محمد صديق المنشاوي",
-            "عبد الباسط عبد الصمد",
-            "محمود خليل الحصري",
-            "مصطفى إسماعيل",
-            "محمود علي البنا",
-            "محمد رفعت",
-            "عبد الرحمن السديس",
-            "سعود الشريم",
-            "ماهر المعيقلي",
-            "مشاري العفاسي"
-        ).forEach { name ->
-            SimpleRow(Icons.Outlined.Headphones, name, "مرتل ومجود بحسب التسجيلات المتاحة")
-        }
-        Spacer(Modifier.height(14.dp))
-        SimpleRow(Icons.Outlined.PlayCircleOutline, "مكتبة المحافل والتسجيلات", "تسجيلات موثقة ومصرح باستخدامها")
-        SimpleRow(Icons.Outlined.MenuBook, "الحفظ والتسميع", "تكرار المقاطع وتسجيل صوتك للمراجعة")
-        SimpleRow(Icons.Outlined.LibraryBooks, "التجويد والتفسير والبحث", "أحكام ملونة وتفسير موثق وبحث في الآيات")
-        SimpleRow(Icons.Outlined.Bookmarks, "العلامات والختمة", "حفظ مواضعك وختمة اختيارية")
-        Spacer(Modifier.height(16.dp))
-        InfoCard(
-            title = "مكتبة التلاوات قيد التجهيز",
-            body = "لن نعرض أزرار تشغيل وهمية. ستُربط التلاوات بعد تحديد مصادر موثوقة والتأكد من حقوق استخدامها."
-      @Composable
 private fun HadithLibraryScreen(modifier: Modifier = Modifier) {
     val client = remember { SunnahApiClient() }
     val scope = rememberCoroutineScope()
@@ -481,11 +447,6 @@ private fun HadithLibraryScreen(modifier: Modifier = Modifier) {
         Spacer(Modifier.height(22.dp))
     }
 }
-   }
-        Spacer(Modifier.height(22.dp))
-    }
-}
-
 @Composable
 private fun AdhkarScreen(modifier: Modifier = Modifier) {
     val context = LocalContext.current
