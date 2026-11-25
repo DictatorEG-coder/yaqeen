@@ -306,20 +306,23 @@ internal fun playQuranFoundationPlaylist(
 
 internal fun playQuranRecitation(controller: MediaController, startSurah: Int, source: QuranAudioSource, availableSurahs: List<Int> = (1..114).toList()) {
     require(startSurah in 1..114) { "Surah number must be between 1 and 114" }
-    val playlist = surahNames.mapIndexed { index, name ->
-        val number = index + 1
+    val orderedSurahs = availableSurahs.filter { it in 1..114 }.distinct().sorted()
+    require(orderedSurahs.isNotEmpty()) { "No surahs are available for this recording" }
+    val playlist = orderedSurahs.map { number ->
+        val name = surahNames[number - 1]
         MediaItem.Builder()
             .setMediaId("${source.id}-$number")
             .setUri(source.baseUrl + String.format(Locale.US, "%03d.mp3", number))
             .setMediaMetadata(
                 MediaMetadata.Builder()
                     .setTitle(name)
-                    .setArtist("${source.reciterName} · ${source.style} · Quran Foundation / QuranicAudio")
+                    .setArtist("${source.reciterName} · ${source.style} · MP3Quran")
                     .build()
             )
             .build()
     }
-    controller.setMediaItems(playlist, startSurah - 1, 0L)
+    val startIndex = orderedSurahs.indexOf(startSurah).coerceAtLeast(0)
+    controller.setMediaItems(playlist, startIndex, 0L)
     controller.prepare()
     controller.play()
 }
