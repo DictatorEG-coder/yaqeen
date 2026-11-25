@@ -458,10 +458,24 @@ private fun AdhkarScreen(modifier: Modifier = Modifier) {
     var selectedCategory by remember { mutableStateOf<String?>(null) }
     var search by remember { mutableStateOf("") }
     val categories = remember { verifiedAdhkarEntries.map { it.category }.distinct() }
-    val visibleCategories = categories.filter { it.contains(search.trim(), ignoreCase = true) }
-    val entries = verifiedAdhkarEntries.filter { entry ->
-        (selectedCategory == null || entry.category == selectedCategory) &&
-            (search.isBlank() || entry.text.contains(search.trim(), ignoreCase = true) || entry.category.contains(search.trim(), ignoreCase = true))
+    val query = search.trim()
+    // Search across the actual dhikr text as well as category titles, not just the index labels.
+    val matchingEntries = remember(query) {
+        if (query.isBlank()) emptyList()
+        else verifiedAdhkarEntries.filter { entry ->
+            entry.text.contains(query, ignoreCase = true) ||
+                entry.category.contains(query, ignoreCase = true)
+        }
+    }
+    val visibleCategories = remember(categories, query, matchingEntries) {
+        if (query.isBlank()) categories
+        else categories.filter { category -> matchingEntries.any { it.category == category } }
+    }
+    val entries = remember(selectedCategory, query) {
+        verifiedAdhkarEntries.filter { entry ->
+            (selectedCategory == null || entry.category == selectedCategory) &&
+                (query.isBlank() || entry.text.contains(query, ignoreCase = true) || entry.category.contains(query, ignoreCase = true))
+        }
     }
     LaunchedEffect(Unit) {
         while (true) {
@@ -471,20 +485,26 @@ private fun AdhkarScreen(modifier: Modifier = Modifier) {
         }
     }
     PageColumn(modifier) {
-        PageHeader("الأذكار", "حصن المسلم كاملًا · 132 بابًا · 267 ذكرًا ودعاءً")
-        OutlinedTextField(value = search, onValueChange = { search = it }, modifier = Modifier.fillMaxWidth(), label = { Text("ابحث في الأذكار أو أسماء الأبواب") }, singleLine = true)
+        PageHeader("الأذكار", "حصن المسلم · 132 بابًا · 267 نصًا من بيانات المصدر")
+        OutlinedTextField(value = search, onValueChange = { search = it; selectedCategory = null }, modifier = Modifier.fillMaxWidth(), label = { Text("ابحث داخل نصوص الأذكار وأسماء الأبواب") }, singleLine = true)
         Spacer(Modifier.height(10.dp))
         if (selectedCategory == null) {
             SectionHeading("أبواب حصن المسلم")
             Text("اختر الباب لعرض أذكاره وعدّاد كل ذكر.", color = Muted, fontSize = 11.sp)
             Spacer(Modifier.height(8.dp))
             visibleCategories.forEach { category ->
-                val amount = verifiedAdhkarEntries.count { it.category == category }
-                SimpleRow(Icons.Outlined.Bookmarks, category, "$amount من الأذكار", onClick = { selectedCategory = category; search = "" })
+                val amount = if (query.isBlank()) verifiedAdhkarEntries.count { it.category == category }
+                    else matchingEntries.count { it.category == category }
+                SimpleRow(
+                    Icons.Outlined.Bookmarks,
+                    category,
+                    if (query.isBlank()) "$amount من الأذكار" else "$amount نتيجة",
+                    onClick = { selectedCategory = category }
+                )
             }
-            if (visibleCategories.isEmpty()) InfoCard("لا توجد أبواب مطابقة", "جرّب كلمة أخرى.")
+            if (visibleCategories.isEmpty()) InfoCard("لا توجد نتائج مطابقة", "لم نعثر على هذه العبارة داخل نصوص الأذكار أو أبوابها.")
         } else {
-            SimpleRow(Icons.Outlined.ArrowBack, "كل الأبواب", "العودة إلى فهرس حصن المسلم", onClick = { selectedCategory = null; search = "" })
+            SimpleRow(Icons.Outlined.ArrowBack, "كل الأبواب", "العودة إلى فهرس حصن المسلم", onClick = { selectedCategory = null })
             SectionHeading(selectedCategory!!)
             Spacer(Modifier.height(8.dp))
             entries.forEach { entry ->
