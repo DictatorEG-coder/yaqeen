@@ -164,6 +164,13 @@ private fun YaqeenApp(initialSurahNumber: Int = 0, openFridayReminders: Boolean 
                         onBookmarksOpened = { openBookmarksRequested = false }
                     )
                     2 -> SunnahScreen(Modifier.padding(padding))
+                    6 -> QuranListeningScreen(Modifier.padding(padding))
+                    7 -> QuranReaderScreen(
+                        modifier = Modifier.padding(padding),
+                        initialSurahNumber = initialSurahNumber,
+                        audioMode = true
+                    )
+                    8 -> SunnahScreen(Modifier.padding(padding))
                     3 -> AdhkarScreen(Modifier.padding(padding))
                     4 -> RemindersScreen(Modifier.padding(padding))
                     else -> MoreScreen(
