@@ -153,8 +153,6 @@ class QuranFoundationClientTest {
         assertFalse(QuranFoundationClient("").isConfigured)
         assertFalse(QuranFoundationClient("http://insecure.example").isConfigured)
     }
-}
-
 
     @Test
     fun offlineMuyassarParserReadsVerseAndFootnotes() {
@@ -172,3 +170,4 @@ class QuranFoundationClientTest {
         assertEquals(null, parseOfflineMuyassarTafsir(json, "1:2"))
         assertEquals(null, parseOfflineMuyassarTafsir(json, "1/x"))
     }
+}
