@@ -129,7 +129,7 @@ private fun YaqeenApp(initialSurahNumber: Int = 0, openFridayReminders: Boolean 
                 bottomBar = {
                     Column {
                         mediaController?.let { player ->
-                            QuranMiniPlayer(player) { selectedTab = 6 }
+                            QuranMiniPlayer(player) { selectedTab = 7 }
                         }
                     NavigationBar(
                         modifier = Modifier.navigationBarsPadding(),
