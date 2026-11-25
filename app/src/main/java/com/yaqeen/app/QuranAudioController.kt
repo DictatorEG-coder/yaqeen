@@ -603,3 +603,110 @@ internal fun QuranAudioPlayerBar(
         }
     }
 }
+
+
+@Composable
+internal fun QuranMiniPlayer(
+    controller: MediaController,
+    onOpenPlayer: () -> Unit
+) {
+    var hasTrack by remember(controller) { mutableStateOf(controller.currentMediaItem != null) }
+    var playing by remember(controller) { mutableStateOf(controller.isPlaying) }
+    var title by remember(controller) {
+        mutableStateOf(controller.currentMediaItem?.mediaMetadata?.title?.toString().orEmpty())
+    }
+    var artist by remember(controller) {
+        mutableStateOf(controller.currentMediaItem?.mediaMetadata?.artist?.toString().orEmpty())
+    }
+    var position by remember(controller) { mutableStateOf(controller.currentPosition.coerceAtLeast(0L)) }
+    var duration by remember(controller) { mutableStateOf(controller.duration.coerceAtLeast(0L)) }
+
+    DisposableEffect(controller) {
+        val listener = object : Player.Listener {
+            override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                hasTrack = mediaItem != null
+                title = mediaItem?.mediaMetadata?.title?.toString().orEmpty()
+                artist = mediaItem?.mediaMetadata?.artist?.toString().orEmpty()
+                position = 0L
+                duration = controller.duration.coerceAtLeast(0L)
+            }
+
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                playing = isPlaying
+            }
+
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                duration = controller.duration.coerceAtLeast(0L)
+                hasTrack = controller.currentMediaItem != null
+            }
+        }
+        controller.addListener(listener)
+        onDispose { controller.removeListener(listener) }
+    }
+
+    LaunchedEffect(controller, hasTrack) {
+        while (isActive && hasTrack) {
+            position = controller.currentPosition.coerceAtLeast(0L)
+            duration = controller.duration.coerceAtLeast(0L)
+            playing = controller.isPlaying
+            delay(700)
+        }
+    }
+
+    if (hasTrack) {
+        val progress = if (duration > 0L) (position.toFloat() / duration).coerceIn(0f, 1f) else 0f
+        Card(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 4.dp)
+                .clickable(onClick = onOpenPlayer),
+            colors = CardDefaults.cardColors(containerColor = AudioPanel),
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp)
+        ) {
+            Column(Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            title.ifBlank { "تلاوة قرآنية" },
+                            color = AudioWhite,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            artist.ifBlank { "يَقِين" },
+                            color = AudioMuted,
+                            fontSize = 10.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    IconButton(onClick = { controller.seekToPreviousMediaItem() }) {
+                        Icon(Icons.Outlined.SkipPrevious, contentDescription = "السورة السابقة", tint = AudioGold)
+                    }
+                    IconButton(onClick = { if (controller.isPlaying) controller.pause() else controller.play() }) {
+                        Icon(
+                            if (playing) Icons.Outlined.Pause else Icons.Outlined.PlayArrow,
+                            contentDescription = if (playing) "إيقاف مؤقت" else "تشغيل",
+                            tint = AudioGold
+                        )
+                    }
+                    IconButton(onClick = { controller.seekToNextMediaItem() }) {
+                        Icon(Icons.Outlined.SkipNext, contentDescription = "السورة التالية", tint = AudioGold)
+                    }
+                }
+                LinearProgressIndicator(
+                    progress = progress,
+                    modifier = Modifier.fillMaxWidth(),
+                    color = AudioGold,
+                    trackColor = AudioMuted.copy(alpha = 0.22f)
+                )
+            }
+        }
+    }
+}
