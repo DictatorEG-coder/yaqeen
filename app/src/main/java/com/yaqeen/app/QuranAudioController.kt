@@ -63,6 +63,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.io.File
+import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.exoplayer.ExoPlayer
@@ -138,6 +139,7 @@ class QuranPlaybackService : MediaSessionService() {
     private var downloadManager: DownloadManager? = null
     private var audioCache: SimpleCache? = null
     private var downloadListener: DownloadManager.Listener? = null
+    private var downloadExecutor: ExecutorService? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -155,12 +157,14 @@ class QuranPlaybackService : MediaSessionService() {
             .setConnectTimeoutMs(15_000)
             .setReadTimeoutMs(30_000)
 
+        val executor = Executors.newFixedThreadPool(2)
+        downloadExecutor = executor
         val manager = DownloadManager(
             this,
             databaseProvider,
             cache,
             upstreamFactory,
-            Executors.newFixedThreadPool(2)
+            executor
         )
         manager.maxParallelDownloads = 2
         downloadManager = manager
@@ -235,6 +239,8 @@ class QuranPlaybackService : MediaSessionService() {
         downloadListener?.let { listener -> downloadManager?.removeListener(listener) }
         downloadManager?.release()
         downloadManager = null
+        downloadExecutor?.shutdown()
+        downloadExecutor = null
         mediaSession?.let { session ->
             session.player.release()
             session.release()
