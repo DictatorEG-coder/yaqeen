@@ -17,12 +17,22 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Headphones
 import androidx.compose.material.icons.outlined.PlayCircleOutline
+import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.outlined.Pause
+import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -50,6 +60,7 @@ internal fun QuranListeningScreen(
     sharedMediaController: androidx.media3.session.MediaController? = null
 ) {
     val controller = sharedMediaController ?: rememberQuranMediaController()
+    val downloads by QuranPlaybackService.downloads.collectAsState()
     val context = LocalContext.current
     var quranTextData by remember { mutableStateOf<List<QuranSurah>>(emptyList()) }
     LaunchedEffect(context) { quranTextData = withContext(Dispatchers.IO) { loadQuran(context) } }
@@ -134,15 +145,89 @@ internal fun QuranListeningScreen(
                 )
                 Spacer(Modifier.height(12.dp))
                 Text("اختر السورة", color = ListenText, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                val source = selectedSource!!
+                Button(
+                    onClick = { selectedSurahs.forEach { QuranPlaybackService.enqueueDownload(source, it) } },
+                    enabled = controller != null,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = ListenGold),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("تنزيل كل السور المتاحة · ${selectedSurahs.size}", color = ListenBackground)
+                }
+                Spacer(Modifier.height(8.dp))
                 filteredSurahs.forEach { (number, name) ->
-                    ListenChoice(Icons.Outlined.PlayCircleOutline, name, "تشغيل السورة") {
-                        val player = controller
-                        val source = selectedSource
-                        if (player != null && source != null) playQuranRecitation(player, number, source, selectedSurahs)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        ListenChoice(
+                            Icons.Outlined.PlayCircleOutline,
+                            name,
+                            "تشغيل السورة",
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            val player = controller
+                            if (player != null) playQuranRecitation(player, number, source, selectedSurahs)
+                        }
+                        IconButton(
+                            enabled = controller != null,
+                            onClick = { QuranPlaybackService.enqueueDownload(source, number) }
+                        ) {
+                            Icon(Icons.Outlined.Download, contentDescription = "تنزيل سورة $name", tint = ListenGold)
+                        }
                     }
                 }
                 Spacer(Modifier.height(12.dp))
-                val source = selectedSource!!
+                val sourceDownloads = downloads.filter { it.request.id.startsWith("quran-${source.id}-") }
+                if (sourceDownloads.isNotEmpty()) {
+                    Text("إدارة التنزيلات", color = ListenGold, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TextButton(onClick = { QuranPlaybackService.pauseDownloads() }) {
+                            Icon(Icons.Outlined.Pause, contentDescription = null, tint = ListenGold)
+                            Text("إيقاف مؤقت", color = ListenGold, fontSize = 11.sp)
+                        }
+                        TextButton(onClick = { QuranPlaybackService.resumeDownloads() }) {
+                            Icon(Icons.Outlined.PlayArrow, contentDescription = null, tint = ListenGold)
+                            Text("استئناف", color = ListenGold, fontSize = 11.sp)
+                        }
+                    }
+                    sourceDownloads.forEach { download ->
+                        val surahNumber = download.request.id.substringAfterLast('-').toIntOrNull()
+                        val surahName = surahNumber?.let { surahNames.getOrNull(it - 1) } ?: "تلاوة"
+                        val status = when (download.state) {
+                            androidx.media3.exoplayer.offline.Download.STATE_COMPLETED -> "مكتملة · متاحة دون إنترنت"
+                            androidx.media3.exoplayer.offline.Download.STATE_DOWNLOADING -> "جارٍ التنزيل"
+                            androidx.media3.exoplayer.offline.Download.STATE_QUEUED -> "في الانتظار أو متوقفة مؤقتًا"
+                            androidx.media3.exoplayer.offline.Download.STATE_FAILED -> "فشل التنزيل · يمكنك إعادة المحاولة"
+                            else -> "قيد المعالجة"
+                        }
+                        Card(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                            colors = CardDefaults.cardColors(containerColor = ListenPanel),
+                            shape = RoundedCornerShape(13.dp)
+                        ) {
+                            Column(Modifier.padding(12.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Column(Modifier.weight(1f)) {
+                                        Text(surahName, color = ListenText, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                                        Text(status, color = ListenMuted, fontSize = 10.sp)
+                                    }
+                                    IconButton(onClick = { QuranPlaybackService.removeDownload(download.request.id) }) {
+                                        Icon(Icons.Outlined.DeleteOutline, contentDescription = "حذف التنزيل", tint = ListenMuted)
+                                    }
+                                }
+                                if (download.state != androidx.media3.exoplayer.offline.Download.STATE_COMPLETED) {
+                                    val progress = (download.percentDownloaded / 100f).coerceIn(0f, 1f)
+                                    LinearProgressIndicator(
+                                        progress = progress,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        color = ListenGold,
+                                        trackColor = ListenMuted.copy(alpha = 0.2f)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
                 QuranAudioPlayerBar(
                     controller = controller,
                     selectedSource = source,
@@ -170,10 +255,11 @@ private fun ListenChoice(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     title: String,
     subtitle: String,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp).clickable(onClick = onClick),
+        modifier = modifier.fillMaxWidth().padding(vertical = 5.dp).clickable(onClick = onClick),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = ListenPanel)
     ) {
