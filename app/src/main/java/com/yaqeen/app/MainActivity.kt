@@ -163,14 +163,14 @@ private fun YaqeenApp(initialSurahNumber: Int = 0, openFridayReminders: Boolean 
                         initialSurahNumber = initialSurahNumber,
                         onBookmarksOpened = { openBookmarksRequested = false }
                     )
-                    2 -> SunnahScreen(Modifier.padding(padding))
+                    2 -> HadithLibraryScreen(Modifier.padding(padding))
                     6 -> QuranListeningScreen(Modifier.padding(padding))
                     7 -> QuranReaderScreen(
                         modifier = Modifier.padding(padding),
                         initialSurahNumber = initialSurahNumber,
                         audioMode = true
                     )
-                    8 -> SunnahScreen(Modifier.padding(padding))
+                    8 -> SunnahMahjooraScreen(Modifier.padding(padding))
                     3 -> AdhkarScreen(Modifier.padding(padding))
                     4 -> RemindersScreen(Modifier.padding(padding))
                     else -> MoreScreen(
@@ -371,7 +371,7 @@ private fun QuranScreen(modifier: Modifier = Modifier) {
             title = "مكتبة التلاوات قيد التجهيز",
             body = "لن نعرض أزرار تشغيل وهمية. ستُربط التلاوات بعد تحديد مصادر موثوقة والتأكد من حقوق استخدامها."
       @Composable
-private fun SunnahScreen(modifier: Modifier = Modifier) {
+private fun HadithLibraryScreen(modifier: Modifier = Modifier) {
     val client = remember { SunnahApiClient() }
     val scope = rememberCoroutineScope()
     val collectionNames = remember { linkedMapOf(
