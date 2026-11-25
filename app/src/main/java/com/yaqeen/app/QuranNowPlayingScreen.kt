@@ -63,8 +63,11 @@ internal fun QuranNowPlayingScreen(
     var trackTitle by remember { mutableStateOf("لم يبدأ التشغيل بعد") }
     var artist by remember { mutableStateOf("اختر قارئًا وسورة من مكتبة الاستماع") }
 
-    LaunchedEffect(Unit) {
-        recordings = Mp3QuranCatalogClient.loadCachedRecitations(context.applicationContext)
+    LaunchedEffect(context) {
+        val cached = Mp3QuranCatalogClient.loadCachedRecitations(context.applicationContext)
+        if (cached.isNotEmpty()) recordings = cached
+        runCatching { Mp3QuranCatalogClient.fetchRecitations(context.applicationContext) }
+            .onSuccess { recordings = it }
     }
 
     LaunchedEffect(controller, recordings) {
