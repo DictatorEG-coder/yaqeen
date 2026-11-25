@@ -237,16 +237,23 @@ fun QuranReaderScreen(
         tafsirError = null
         tafsirLoading = true
         try {
-            val client = QuranFoundationClient()
-            check(client.isConfigured) {
-                "مصدر التفسير غير مربوط بعد. يلزم إعداد خادم Quran Foundation ومنحه صلاحية tafsirs."
+            val offline = withContext(Dispatchers.IO) {
+                OfflineTafsirRepository.find(context.applicationContext, key)
             }
-            val resources = client.fetchArabicTafsirResources()
-            val resource = resources.firstOrNull()
-                ?: throw IllegalStateException("لا تتوفر حاليًا موارد تفسير عربية من المصدر.")
-            tafsirText = client.fetchTafsirForVerse(resource.id, key)
+            if (offline != null) {
+                tafsirText = offline
+            } else {
+                val client = QuranFoundationClient()
+                check(client.isConfigured) {
+                    "التفسير الميسر غير متاح محليًا، ومصدر التفسير عبر الإنترنت غير مربوط."
+                }
+                val resources = client.fetchArabicTafsirResources()
+                val resource = resources.firstOrNull()
+                    ?: throw IllegalStateException("لا تتوفر حاليًا موارد تفسير عربية من المصدر.")
+                tafsirText = client.fetchTafsirForVerse(resource.id, key)
+            }
         } catch (error: Exception) {
-            tafsirError = error.message ?: "تعذّر تحميل التفسير من المصدر."
+            tafsirError = error.message ?: "تعذّر تحميل التفسير."
         } finally {
             tafsirLoading = false
         }
